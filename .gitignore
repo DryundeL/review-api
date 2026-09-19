@@ -1,1 +1,6 @@
 .env
+bin/
+coverage.out
+*.test
+.idea/
+.DS_Store

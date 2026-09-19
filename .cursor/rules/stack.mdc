@@ -1,0 +1,29 @@
+---
+description: Стек review-api — Go 1.27, pgx, sqlc, Goose, Echo, slog
+alwaysApply: true
+---
+
+# Stack
+
+Не копировать технологии из `analytic` (GORM, golang-migrate, JWT/SSO).
+
+| Задача | Технология |
+|---|---|
+| Backend | Go 1.27.x |
+| HTTP | Echo v4 поверх `net/http` |
+| DB | PostgreSQL + pgx v5 (pgxpool) |
+| SQL | sqlc (`queries.sql` в infrastructure) |
+| Migrations | Goose |
+| Cache | Redis |
+| Files | S3-compatible (модуль media) |
+| API schema | OpenAPI |
+| Async | worker + PostgreSQL Outbox |
+| Observability | OpenTelemetry |
+| Metrics | Prometheus |
+| Logs | slog |
+
+TX: `pgx.Tx` в context (`platform/transaction`), не GORM.
+
+HTTP: Echo, не chi. OpenAPI собирается из delivery.
+
+Front (другой репозиторий): TypeScript, React, Next.js, Telegram WebApp SDK.

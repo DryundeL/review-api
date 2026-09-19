@@ -1,0 +1,175 @@
+version: "3"
+
+vars:
+  SERVICE: '{{.SERVICE | default "app"}}'
+  STEPS: '{{.STEPS | default "1"}}'
+  VERSION: '{{.VERSION | default "0"}}'
+
+tasks:
+  default:
+    desc: Show available commands
+    cmds:
+      - task: help
+
+  # Docker commands
+  docker-prune-dangling:
+    desc: Remove untagged (dangling) images only
+    cmds:
+      - echo "Removing dangling images..."
+      - docker image prune -f
+
+  docker-build:
+    desc: Build Docker images, prune dangling images
+    cmds:
+      - echo "Building Docker images..."
+      - docker compose build
+      - task: docker-prune-dangling
+
+  docker-up:
+    desc: Start containers in background
+    cmds:
+      - echo "Starting Docker containers..."
+      - docker compose up -d
+
+  docker-down:
+    desc: Stop and remove containers
+    cmds:
+      - echo "Stopping Docker containers..."
+      - docker compose down
+
+  docker-restart:
+    desc: Rebuild app, prune dangling images, restart container
+    cmds:
+      - echo "Rebuilding and restarting containers..."
+      - docker compose build app
+      - task: docker-prune-dangling
+      - docker compose up -d --force-recreate app
+
+  docker-logs:
+    desc: View logs (default SERVICE=app)
+    cmds:
+      - docker compose logs -f {{.SERVICE}}
+
+  docker-ps:
+    desc: Show running containers
+    cmds:
+      - echo "Running containers:"
+      - docker compose ps
+
+  docker-migrate:
+    desc: Run migrations in Docker
+    cmds:
+      - echo "Running migrations..."
+      - docker compose --profile tools run --rm migrator
+
+  # Migration commands
+  migrate-up:
+    desc: Apply all pending migrations
+    cmds:
+      - echo "Applying all pending migrations..."
+      - go run cmd/migrator/main.go -command=up
+
+  migrate-down:
+    desc: Rollback last migration
+    cmds:
+      - echo "Rolling back last migration..."
+      - go run cmd/migrator/main.go -command=down
+
+  migrate-version:
+    desc: Show current migration version
+    cmds:
+      - echo "Checking migration version..."
+      - go run cmd/migrator/main.go -command=version
+
+  migrate-steps:
+    desc: Apply N migrations (default STEPS=1)
+    cmds:
+      - echo "Applying migrations (use STEPS=N to specify number, e.g., task migrate-steps STEPS=1)..."
+      - go run cmd/migrator/main.go -command=up -steps={{.STEPS}}
+
+  migrate-down-steps:
+    desc: Rollback N migrations (default STEPS=1)
+    cmds:
+      - echo "Rolling back migrations (use STEPS=N to specify number, e.g., task migrate-down-steps STEPS=1)..."
+      - go run cmd/migrator/main.go -command=down -steps={{.STEPS}}
+
+  migrate-force:
+    desc: Force migration version (default VERSION=0)
+    cmds:
+      - echo "Forcing migration version (use VERSION=N to specify version, e.g., task migrate-force VERSION=1)..."
+      - go run cmd/migrator/main.go -command=force -version={{.VERSION}}
+
+  # Build commands
+  build:
+    desc: Build application with git commit hash as version
+    cmds:
+      - |
+        echo "Building application..."
+        VERSION=$(git rev-parse --short HEAD 2>/dev/null || date +%s)
+        echo "Version: $VERSION"
+        export APP_VERSION=$VERSION
+        go build -ldflags "-X analytic/internal/platform/config.version=$VERSION" -o bin/analytic cmd/analytic/main.go
+        echo "Building migrator..."
+        go build -o bin/migrator cmd/migrator/main.go
+        echo "Build complete!"
+
+  build-dev:
+    desc: Build application for development (injects version into HTML)
+    cmds:
+      - |
+        echo "Building application for development..."
+        VERSION=$(date +%s)
+        echo "Version: $VERSION"
+        export APP_VERSION=$VERSION
+        ./scripts/inject-version.sh $VERSION || echo "Warning: Could not inject version"
+        go build -ldflags "-X analytic/internal/platform/config.version=$VERSION" -o bin/analytic cmd/analytic/main.go
+        echo "Building migrator..."
+        go build -o bin/migrator cmd/migrator/main.go
+        echo "Build complete!"
+
+  inject-version:
+    desc: Inject version into HTML files for cache busting
+    cmds:
+      - |
+        VERSION=$(git rev-parse --short HEAD 2>/dev/null || date +%s)
+        echo "Injecting version $VERSION..."
+        ./scripts/inject-version.sh $VERSION
+
+  help:
+    desc: Show available commands
+    cmds:
+      - |
+        echo "Available commands:"
+        echo ""
+        echo "Docker commands:"
+        echo "  task docker-build            - Build Docker images, prune dangling images"
+        echo "  task docker-prune-dangling   - Remove untagged (dangling) images only"
+        echo "  task docker-up               - Start containers in background"
+        echo "  task docker-down             - Stop and remove containers"
+        echo "  task docker-restart          - Rebuild app, prune dangling images, restart container"
+        echo "  task docker-logs [SERVICE=x] - View logs (default: app)"
+        echo "  task docker-ps               - Show running containers"
+        echo "  task docker-migrate          - Run migrations in Docker"
+        echo ""
+        echo "Build commands:"
+        echo "  task build                   - Build application with git commit hash as version"
+        echo "  task build-dev               - Build application for development (injects version into HTML)"
+        echo "  task inject-version          - Inject version into HTML files for cache busting"
+        echo ""
+        echo "Migration commands:"
+        echo "  task migrate-up              - Apply all pending migrations"
+        echo "  task migrate-down            - Rollback last migration"
+        echo "  task migrate-version         - Show current migration version"
+        echo "  task migrate-steps STEPS=N   - Apply N migrations (default: 1)"
+        echo "  task migrate-down-steps STEPS=N - Rollback N migrations (default: 1)"
+        echo "  task migrate-force VERSION=N - Force migration version"
+        echo ""
+        echo "Examples:"
+        echo "  task build"
+        echo "  task build-dev"
+        echo "  task docker-up              # Start all services"
+        echo "  task docker-down            # Stop everything"
+        echo "  task docker-restart         # Rebuild app after code changes"
+        echo "  task docker-logs SERVICE=postgres  # Logs for specific service"
+        echo "  task migrate-up"
+        echo "  task migrate-steps STEPS=2"

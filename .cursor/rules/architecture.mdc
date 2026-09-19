@@ -1,0 +1,44 @@
+---
+description: Форма модульного монолита — как analytic/project, без стека analytic
+alwaysApply: true
+---
+
+# Architecture
+
+Модульный монолит. Форма BC — как `analytic/internal/modules/project`. Стек — `.cursor/rules/stack.mdc`, не GORM и не golang-migrate.
+
+Карта модулей: `CAPABILITY-MAP.md`. Не переименовывать module id.
+
+```
+internal/
+├── modules/<bc>/
+│   ├── module.go
+│   ├── contract/
+│   ├── events.go
+│   └── internal/
+│       ├── domain/
+│       ├── application/{command,query,ports}
+│       ├── infrastructure/{write,read}
+│       └── delivery/http/
+├── platform/          # не BC
+└── app/               # composition root
+```
+
+## Rules
+
+1. Echo / `net/http` — только в `**/delivery/http` и `platform/httpserver`. `module.go` может иметь `RegisterHTTP`.
+2. Command меняет состояние только через aggregate + outbox в одной pgx TX.
+3. Query читает DTO через sqlc (`infrastructure/read`), без гидрации aggregate.
+4. Один use-case ≈ один handler. Явная инъекция в `module.go`. Без CommandBus.
+5. Чужой BC не импортирует `module/*/internal`. Только `contract` и `events`.
+6. Domain не зависит от pgx, sqlc, Echo, Redis, S3.
+7. Delivery не держит `pgxpool` и sqlc напрямую — только application handlers.
+8. Таблицы принадлежат модулю. Один PostgreSQL.
+
+```go
+// BAD: reviews вызывает gamification из command
+h.gamification.Unlock(ctx, userID)
+
+// GOOD: та же TX, outbox; worker зовёт consumer
+h.publisher.Publish(txCtx, review.EventPublished, "review", id, payload)
+```

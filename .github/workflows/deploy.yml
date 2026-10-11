@@ -41,9 +41,10 @@ jobs:
       - name: Package release
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
-          mkdir -p "$RUNNER_TEMP/release"
+          mkdir -p "$RUNNER_TEMP/release/deploy"
           docker save "review-api:$GITHUB_SHA" | gzip > "$RUNNER_TEMP/release/image.tar.gz"
           cp compose.yaml "$RUNNER_TEMP/release/"
+          cp deploy/redis-entrypoint.sh "$RUNNER_TEMP/release/deploy/"
           cp deploy/pull.sh "$RUNNER_TEMP/release/"
           printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/release/.release-version"
           tar -czf "$RUNNER_TEMP/release.tar.gz" -C "$RUNNER_TEMP/release" .

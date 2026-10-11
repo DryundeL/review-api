@@ -29,9 +29,10 @@ else
   docker image inspect "review-api:${APP_VERSION:?Release version required}" >/dev/null
 fi
 # API applies embedded migrations before serving requests. Stop the old worker
-# first so that it cannot process records against a changing schema.
-docker compose stop worker
+# and bot first so that they cannot process records against a changing schema.
+docker compose stop worker bot
 docker compose up -d --no-build --wait --wait-timeout 120 app
-# Recreate worker even when reusing the local image tag.
+# Recreate worker and bot even when reusing the local image tag.
 docker compose up -d --no-build --force-recreate --wait --wait-timeout 60 worker
+docker compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 60 bot
 docker compose ps

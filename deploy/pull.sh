@@ -28,10 +28,11 @@ compose() {
 compose config --quiet
 docker image inspect "review-api:$revision" >/dev/null
 compose up -d --no-build --wait --wait-timeout 120 postgres redis
-compose stop worker
+compose stop worker bot
 # API applies migrations before becoming ready. Do not restart the databases.
 compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 app
 compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 60 worker
+compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 60 bot
 ln -sfn "$release" "$state/current.next"
 mv -Tf "$state/current.next" "$state/current"
 compose ps

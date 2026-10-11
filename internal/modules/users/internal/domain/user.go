@@ -1,0 +1,120 @@
+package domain
+
+import (
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
+
+	"review-api/internal/modules/users/contract"
+)
+
+const (
+	maxNameLen     = 64
+	maxUsernameLen = 32
+	maxLangLen     = 16
+)
+
+// User is the stored profile. Optional strings are empty when the column is NULL.
+type User struct {
+	ID           uuid.UUID
+	TelegramID   int64
+	Username     string
+	FirstName    string
+	LastName     string
+	LanguageCode string
+	IsPremium    bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func NewUser(p contract.TelegramProfile, now time.Time) (User, error) {
+	if p.IsBot || p.TelegramID <= 0 {
+		return User{}, contract.ErrInvalidProfile
+	}
+	first, err := cleanName(p.FirstName, true)
+	if err != nil {
+		return User{}, err
+	}
+	last, err := cleanName(p.LastName, false)
+	if err != nil {
+		return User{}, err
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	now = now.UTC()
+	return User{
+		ID:           uuid.New(),
+		TelegramID:   p.TelegramID,
+		Username:     cleanUsername(p.Username),
+		FirstName:    first,
+		LastName:     last,
+		LanguageCode: cleanLanguage(p.LanguageCode),
+		IsPremium:    p.IsPremium,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}, nil
+}
+
+func cleanName(value string, required bool) (string, error) {
+	value = strings.TrimSpace(strings.Map(dropUnsafeRune, value))
+	value = strings.TrimSpace(value)
+	if value == "" {
+		if required {
+			return "", contract.ErrInvalidProfile
+		}
+		return "", nil
+	}
+	if utf8.RuneCountInString(value) > maxNameLen {
+		value = strings.TrimSpace(string([]rune(value)[:maxNameLen]))
+	}
+	if value == "" {
+		if required {
+			return "", contract.ErrInvalidProfile
+		}
+		return "", nil
+	}
+	return value, nil
+}
+
+func dropUnsafeRune(r rune) rune {
+	if r == '\u200d' || r == '\ufe0f' {
+		return r
+	}
+	if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+		return -1
+	}
+	return r
+}
+
+func cleanUsername(value string) string {
+	value = strings.TrimPrefix(strings.TrimSpace(value), "@")
+	if value == "" || len(value) > maxUsernameLen {
+		return ""
+	}
+	for _, r := range value {
+		if (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+			return ""
+		}
+	}
+	return value
+}
+
+func cleanLanguage(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) < 2 || len(value) > maxLangLen || strings.HasSuffix(value, "-") {
+		return ""
+	}
+	for i, r := range value {
+		switch {
+		case r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+		case r == '-' && i > 0:
+		default:
+			return ""
+		}
+	}
+	return value
+}

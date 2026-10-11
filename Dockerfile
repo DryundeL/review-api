@@ -7,6 +7,7 @@ COPY internal ./internal
 COPY migrations ./migrations
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/api ./cmd/api && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/worker ./cmd/worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/bot ./cmd/bot && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/migrator ./cmd/migrator
 
 FROM alpine:3.23

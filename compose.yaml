@@ -47,6 +47,19 @@ services:
       app:
         condition: service_healthy
 
+  bot:
+    <<: *app
+    command: [/app/bot]
+    healthcheck:
+      test: [CMD-SHELL, "kill -0 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      app:
+        condition: service_healthy
+
   migrator:
     <<: *app
     restart: "no"

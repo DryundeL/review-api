@@ -18,6 +18,7 @@ cp .env.example .env   # DB_*, REDIS_*, TELEGRAM_BOT_TOKEN
 go run ./cmd/migrator -command=up
 go run ./cmd/api
 go run ./cmd/worker
+go run ./cmd/bot
 ```
 
 - `GET /healthz` — процесс жив
@@ -27,5 +28,5 @@ go run ./cmd/worker
 
 ```
 go test ./...
-go build ./cmd/api ./cmd/worker ./cmd/migrator
+go build ./cmd/api ./cmd/worker ./cmd/bot ./cmd/migrator
 ```

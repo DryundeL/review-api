@@ -1,0 +1,97 @@
+name: review-api
+
+x-app: &app
+  image: review-api:${APP_VERSION:-local}
+  build: .
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:size=16m,mode=1777
+  environment:
+    APP_ENV: production
+    APP_PORT: "8080"
+    APP_URL: ${APP_URL:?Set APP_URL in .env}
+    APP_VERSION: ${APP_VERSION:-local}
+    APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-}
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_USER: review
+    DB_NAME: review
+    DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    DB_SSLMODE: disable
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  app:
+    <<: *app
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  worker:
+    <<: *app
+    command: [/app/worker]
+    depends_on:
+      app:
+        condition: service_healthy
+
+  migrator:
+    <<: *app
+    restart: "no"
+    profiles: [tools]
+    command: [/app/migrator, -command=up]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: review
+      POSTGRES_DB: review
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes", --maxmemory, 128mb, --maxmemory-policy, noeviction]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    logging: *logging
+
+volumes:
+  postgres-data:
+  redis-data:

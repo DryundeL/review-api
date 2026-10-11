@@ -1,49 +1,19 @@
-# Build stage
 FROM golang:1.27-alpine AS builder
-
-WORKDIR /build
-
-# Copy go mod files
+WORKDIR /src
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
+COPY cmd ./cmd
+COPY internal ./internal
+COPY migrations ./migrations
+RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/api ./cmd/api && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/worker ./cmd/worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/migrator ./cmd/migrator
 
-# Copy source code
-COPY . .
-
-# Build binaries
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-w -s" -o bin/analytic cmd/analytic/main.go && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags "-w -s" -o bin/migrator cmd/migrator/main.go && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags "-w -s" -o bin/worker cmd/worker/main.go
-
-# Runtime stage
-FROM alpine:latest
-
-# Install ca-certificates, netcat (for health checks) and apply security updates
-RUN apk update && \
-    apk --no-cache add ca-certificates netcat-openbsd && \
-    rm -rf /var/cache/apk/*
-
+FROM alpine:3.23
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app
 WORKDIR /app
-
-# Copy binaries from builder
-COPY --from=builder /build/bin/analytic .
-COPY --from=builder /build/bin/migrator .
-COPY --from=builder /build/bin/worker .
-
-# Copy migrations directory
-COPY ./migrations ./migrations
-
-# Copy web directory (HTML files and static assets)
-COPY ./web ./web
-
-# Copy entrypoint script
-COPY docker-entrypoint.sh /
-RUN chmod +x /docker-entrypoint.sh
-
-# Set entrypoint
-ENTRYPOINT ["/docker-entrypoint.sh"]
-
-# Run the application
-CMD ["./analytic"]
+COPY --from=builder /out/ /app/
+USER 10001:10001
+EXPOSE 8080
+CMD ["/app/api"]

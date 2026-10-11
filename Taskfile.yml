@@ -38,12 +38,9 @@ tasks:
       - docker compose down
 
   docker-restart:
-    desc: Rebuild app, prune dangling images, restart container
+    desc: Build and deploy API and worker with readiness checks
     cmds:
-      - echo "Rebuilding and restarting containers..."
-      - docker compose build app
-      - task: docker-prune-dangling
-      - docker compose up -d --force-recreate app
+      - sh deploy/deploy.sh
 
   docker-logs:
     desc: View logs (default SERVICE=app)

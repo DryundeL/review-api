@@ -10,6 +10,9 @@ docker-compose.example.yml
 
 # Environment
 .env
+.env.*
+*.pem
+*.key
 .env.local
 .env.*.local
 
@@ -22,6 +25,10 @@ docker-compose.example.yml
 
 # OS
 .DS_Store
+**/._*
+source.tar.gz
+build.log
+.deploy.lock
 Thumbs.db
 
 # Build artifacts

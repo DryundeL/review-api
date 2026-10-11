@@ -1,0 +1,71 @@
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-api-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check formatting and static analysis
+        run: |
+          files=$(gofmt -l cmd internal migrations)
+          if [ -n "$files" ]; then
+            printf '%s\n' "$files"
+            exit 1
+          fi
+          go vet ./...
+      - name: Test
+        run: go test -race ./...
+      - name: Build image
+        run: docker build --tag "review-api:$GITHUB_SHA" .
+      - name: Package release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          mkdir -p "$RUNNER_TEMP/release/deploy"
+          docker save "review-api:$GITHUB_SHA" | gzip > "$RUNNER_TEMP/release/image.tar.gz"
+          cp compose.yaml "$RUNNER_TEMP/release/"
+          cp deploy/deploy.sh "$RUNNER_TEMP/release/deploy/"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/release/.release-version"
+          tar -czf "$RUNNER_TEMP/release.tar.gz" -C "$RUNNER_TEMP/release" .
+      - name: Deploy to server
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          umask 077
+          ssh_dir=$(mktemp -d "$RUNNER_TEMP/deploy-ssh.XXXXXX")
+          trap 'rm -rf "$ssh_dir"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          options=(-i "$ssh_dir/key" -o "UserKnownHostsFile=$ssh_dir/known_hosts"
+            -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          target=wapp@194.146.223.221
+          ssh "${options[@]}" "$target" "mkdir -p /home/wapp/apps/review-api/incoming/$GITHUB_SHA"
+          scp "${options[@]}" "$RUNNER_TEMP/release.tar.gz" \
+            "$target:/home/wapp/apps/review-api/incoming/$GITHUB_SHA/release.tar.gz"
+          ssh "${options[@]}" "$target" "sh -s -- $GITHUB_SHA" < deploy/activate.sh

@@ -4,6 +4,13 @@ Telegram Mini App backend. Modular monolith: форма модуля как `ana
 
 Карта: [CAPABILITY-MAP.md](CAPABILITY-MAP.md).
 
+## Docker и сервер
+
+Настройка пользователя `wapp`, переменных окружения, запуск и откат:
+[deploy/README.md](deploy/README.md). Конфигурация сервисов — `compose.yaml`.
+Push в `main` автоматически запускает проверки, сборку образа и деплой
+через GitHub Actions. В pull request выполняются только проверки и сборка.
+
 ## Запуск
 
 ```

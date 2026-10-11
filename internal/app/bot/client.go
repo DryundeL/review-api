@@ -98,14 +98,18 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64) ([]Update, error)
 	return updates, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) error {
+func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, markup any) error {
 	if chatID <= 0 || text == "" {
 		return fmt.Errorf("telegram sendMessage: invalid request")
 	}
-	return c.post(ctx, "sendMessage", map[string]any{
+	payload := map[string]any{
 		"chat_id": chatID,
 		"text":    text,
-	}, nil)
+	}
+	if markup != nil {
+		payload["reply_markup"] = markup
+	}
+	return c.post(ctx, "sendMessage", payload, nil)
 }
 
 func (c *Client) post(ctx context.Context, method string, payload any, result any) error {

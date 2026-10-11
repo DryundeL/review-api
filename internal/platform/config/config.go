@@ -57,6 +57,7 @@ type AppConfig struct {
 	URL              string
 	Version          string
 	TelegramBotToken string
+	MiniAppURL       string
 	AuthMaxAge       time.Duration
 	RateLimitPerMin  int
 	CORSOrigins      []string
@@ -113,6 +114,7 @@ func Load() (*Config, error) {
 			URL:              getEnv("APP_URL", "http://localhost:8080"),
 			Version:          getEnv("APP_VERSION", "dev"),
 			TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
+			MiniAppURL:       os.Getenv("MINI_APP_URL"),
 			AuthMaxAge:       authMaxAge,
 			RateLimitPerMin:  rateLimit,
 			CORSOrigins:      parseCommaSeparatedList(os.Getenv("APP_CORS_ORIGINS")),

@@ -23,10 +23,11 @@ type userEnsurer interface {
 }
 
 type App struct {
-	db     *pgxpool.Pool
-	users  userEnsurer
-	client *Client
-	log    *slog.Logger
+	db         *pgxpool.Pool
+	users      userEnsurer
+	client     *Client
+	log        *slog.Logger
+	miniAppURL string
 }
 
 func Bootstrap(ctx context.Context) (*App, error) {
@@ -37,15 +38,20 @@ func Bootstrap(ctx context.Context) (*App, error) {
 	if !validToken(cfg.App.TelegramBotToken) {
 		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN format is invalid")
 	}
+	miniAppURL, err := parseMiniAppURL(cfg.App.MiniAppURL)
+	if err != nil {
+		return nil, err
+	}
 	pool, err := database.Connect(ctx, cfg.Database.DSN())
 	if err != nil {
 		return nil, err
 	}
 	return &App{
-		db:     pool,
-		users:  users.New(users.Dependencies{Pool: pool}),
-		client: NewClient(cfg.App.TelegramBotToken),
-		log:    observability.Logger(),
+		db:         pool,
+		users:      users.New(users.Dependencies{Pool: pool}),
+		client:     NewClient(cfg.App.TelegramBotToken),
+		log:        observability.Logger(),
+		miniAppURL: miniAppURL,
 	}, nil
 }
 
@@ -111,7 +117,8 @@ func (a *App) handle(ctx context.Context, update Update) error {
 	if chatID == 0 {
 		return nil
 	}
-	if err := a.client.SendMessage(ctx, chatID, startReply(profile.LanguageCode)); err != nil {
+	text, markup := startMessage(profile, a.miniAppURL)
+	if err := a.client.SendMessage(ctx, chatID, text, markup); err != nil {
 		var api *APIError
 		if errors.As(err, &api) && !api.Temporary() {
 			a.log.Warn("start reply not delivered", "telegram_id", profile.TelegramID, "error", err)

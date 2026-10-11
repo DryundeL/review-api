@@ -2,11 +2,13 @@ package bot
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"review-api/internal/modules/users/contract"
@@ -26,9 +28,11 @@ func (f *fakeUsers) EnsureUser(_ context.Context, profile contract.TelegramProfi
 
 func TestHandleStartSavesProfileAndReplies(t *testing.T) {
 	t.Parallel()
-	var sawReply bool
+	var body map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sawReply = true
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":1}}`)
 	}))
@@ -37,7 +41,12 @@ func TestHandleStartSavesProfileAndReplies(t *testing.T) {
 	store := &fakeUsers{}
 	client := NewClient("123456:abcDEF_token-1")
 	client.base = srv.URL
-	app := &App{users: store, client: client, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	app := &App{
+		users:      store,
+		client:     client,
+		log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		miniAppURL: "https://app.example.com",
+	}
 
 	err := app.handle(context.Background(), Update{
 		UpdateID: 1,
@@ -53,8 +62,14 @@ func TestHandleStartSavesProfileAndReplies(t *testing.T) {
 	if store.calls != 1 || store.profile.TelegramID != 42 || store.profile.Username != "ann" || !store.profile.IsPremium {
 		t.Fatalf("saved %+v calls=%d", store.profile, store.calls)
 	}
-	if !sawReply {
-		t.Fatal("expected reply")
+	text, _ := body["text"].(string)
+	if !strings.Contains(text, "Hi, Ann Lee (@ann).") || !strings.Contains(text, "Your options are below.") {
+		t.Fatalf("text = %q", text)
+	}
+	markup, _ := body["reply_markup"].(map[string]any)
+	rows, _ := markup["inline_keyboard"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("markup = %#v", body["reply_markup"])
 	}
 }
 

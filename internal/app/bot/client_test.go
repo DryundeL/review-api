@@ -70,7 +70,7 @@ func TestClientAPIError(t *testing.T) {
 
 	client := NewClient("123456:abcDEF_token-1")
 	client.base = srv.URL
-	err := client.SendMessage(context.Background(), 42, "Профиль сохранён.")
+	err := client.SendMessage(context.Background(), 42, "Профиль сохранён.", nil)
 	var api *APIError
 	if !errorAs(err, &api) || api.Code != 403 || api.Temporary() {
 		t.Fatalf("err = %v", err)

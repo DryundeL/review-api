@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"strings"
 	"testing"
 
 	"review-api/internal/modules/users/contract"
@@ -67,12 +68,40 @@ func TestStartCommandMentionAndGroupReply(t *testing.T) {
 	}
 }
 
-func TestStartReplyLanguage(t *testing.T) {
+func TestStartMessageKeepsMiniAppButton(t *testing.T) {
 	t.Parallel()
-	if startReply("ru") != "Профиль сохранён." || startReply("") != "Профиль сохранён." {
-		t.Fatal("russian reply")
+	const appURL = "https://app.example.com/review"
+	text, markup := startMessage(contract.TelegramProfile{
+		TelegramID:   42,
+		FirstName:    "Анна\n",
+		LastName:     "Иванова",
+		Username:     "anna",
+		LanguageCode: "ru",
+		IsPremium:    true,
+	}, appURL)
+	for _, part := range []string{"Привет, Анна Иванова (@anna).", "Telegram ID: 42", "Язык: ru", "Premium: да", "Твои возможности ниже."} {
+		if !strings.Contains(text, part) {
+			t.Fatalf("text %q does not contain %q", text, part)
+		}
 	}
-	if startReply("en") != "Profile saved." {
-		t.Fatal("english reply")
+	if len(markup.InlineKeyboard) != 1 || len(markup.InlineKeyboard[0]) != 1 {
+		t.Fatalf("markup = %+v", markup)
+	}
+	button := markup.InlineKeyboard[0][0]
+	if button.Text != "Открыть мини-приложение" || button.WebApp.URL != appURL {
+		t.Fatalf("button = %+v", button)
+	}
+}
+
+func TestParseMiniAppURL(t *testing.T) {
+	t.Parallel()
+	got, err := parseMiniAppURL(" https://app.example.com/review ")
+	if err != nil || got != "https://app.example.com/review" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+	for _, raw := range []string{"", "http://app.example.com", "https://user:pass@app.example.com", "https://localhost/app"} {
+		if _, err := parseMiniAppURL(raw); err == nil {
+			t.Fatalf("accepted %q", raw)
+		}
 	}
 }

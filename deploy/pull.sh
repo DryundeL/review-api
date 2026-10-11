@@ -20,6 +20,7 @@ release="$state/releases/$revision"
 test -f "$root/.env"
 test "$(cat "$release/.release-version")" = "$revision"
 export APP_VERSION="$revision"
+export APP_ENV_FILE="$root/.env"
 cd "$release"
 compose() {
   docker compose --env-file "$root/.env" -f "$release/compose.yaml" "$@"

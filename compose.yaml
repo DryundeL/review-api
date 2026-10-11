@@ -9,24 +9,14 @@ x-app: &app
   security_opt: [no-new-privileges:true]
   tmpfs:
     - /tmp:size=16m,mode=1777
+  env_file:
+    - ${APP_ENV_FILE:-.env}
   environment:
-    APP_ENV: ${APP_ENV:-production}
-    APP_PORT: ${APP_PORT:-8080}
-    APP_URL: ${APP_URL:?Set APP_URL in .env}
+    # Docker network addresses override local addresses in .env.
+    DB_HOST: postgres
+    REDIS_HOST: redis
+    # The tested release SHA is supplied by the deployment script.
     APP_VERSION: ${APP_VERSION:-local}
-    APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-}
-    DB_HOST: ${DB_HOST:?Set DB_HOST in .env}
-    DB_PORT: ${DB_PORT:-5432}
-    DB_USER: ${DB_USER:?Set DB_USER in .env}
-    DB_NAME: ${DB_NAME:?Set DB_NAME in .env}
-    DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    DB_SSLMODE: ${DB_SSLMODE:-disable}
-    REDIS_HOST: ${REDIS_HOST:?Set REDIS_HOST in .env}
-    REDIS_PORT: ${REDIS_PORT:-6379}
-    REDIS_USER: ${REDIS_USER:-}
-    REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    REDIS_DB: ${REDIS_DB:-0}
-    TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
   logging: &logging
     driver: json-file
     options:

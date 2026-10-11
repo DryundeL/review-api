@@ -1,152 +1,91 @@
-# Деплой от пользователя wapp
+# Деплой review-api
 
-Каталог проекта: `/home/wapp/apps/review-api`. Требуются Docker Engine,
-Docker Compose с поддержкой `up --wait`, Linux `flock` и доступ к registry.
+## На сервере
 
-## Автодеплой
+В `/home/wapp/apps/review-api` находятся только:
 
-Каждый push в `main` запускает `.github/workflows/deploy.yml`:
-проверка форматирования, `go vet`, тесты с race detector, сборка Docker-образа
-на GitHub, доставка по SSH и запуск с проверкой готовности.
-Pull request запускает проверки и сборку без доступа к серверу.
-Также доступен ручной запуск workflow для ветки `main`.
+- `.env` — настройки и секреты приложения, права `600`;
+- `pull.sh` — перезапуск приложения, права `700`, владелец `wapp`.
 
-В GitHub Actions Secrets используются `DEPLOY_SSH_KEY` (отдельный ключ для
-`wapp`) и `DEPLOY_KNOWN_HOSTS` (проверенный SSH host key сервера).
-Секреты приложения остаются в `/home/wapp/apps/review-api/.env`.
-Доступ к изменению `main` и workflow означает доступ к деплою приложения.
-
-Образы имеют тег полного SHA коммита. Конфигурация каждого релиза хранится в
-`/home/wapp/apps/review-api/releases/<SHA>`, `current` указывает на последний
-успешно запущенный релиз. Деплои из GitHub выполняются последовательно;
-общая блокировка также защищает от одновременного ручного обновления.
-
-После включения CI не запускайте старую копию проекта из корневого каталога
-для обновления production: сделайте push в `main`.
-Для проверки работающего релиза:
-
-```sh
-cd /home/wapp/apps/review-api/current
-APP_VERSION=$(cat .release-version) docker compose ps
-curl --fail http://127.0.0.1:8080/readyz
-```
-
-При неудачной проверке готовности workflow завершается ошибкой. Автоматический
-откат схемы БД не выполняется. Для отката на сохранённый совместимый релиз:
-
-```sh
-cd /home/wapp/apps/review-api/releases/<PREVIOUS_SHA>
-DOCKER_CONTEXT=rootless DEPLOY_LOCK_FILE=/home/wapp/apps/review-api/.deploy.lock sh deploy/deploy.sh --no-build
-ln -sfn "$PWD" /home/wapp/apps/review-api/current
-```
-
-Не удаляйте образы, нужные для отката. Старые релизы и образы периодически
-удаляйте после проверки резервных копий и стабильности обновления.
-
-## Доступ к Docker
-
-Предпочтителен rootless Docker. Администратор устанавливает `uidmap` и
-`dbus-user-session`, включает `loginctl enable-linger wapp`. Затем в SSH-сессии
-пользователя `wapp`:
-
-```sh
-dockerd-rootless-setuptool.sh install
-docker context use rootless
-docker info
-```
-
-При ошибке предварительных проверок исправьте указанные зависимости/настройки
-Ubuntu по https://docs.docker.com/engine/security/rootless/troubleshoot/.
-Не отключайте AppArmor целиком.
-
-Альтернатива для уже установленного системного Docker:
-`sudo usermod -aG docker wapp`, затем новая SSH-сессия. Членство в группе
-`docker` фактически предоставляет права root на сервере.
-
-## Первый запуск
-
-Разместите исходники в каталоге проекта, затем от `wapp`:
+Выполнять без `sudo`, от пользователя `wapp`:
 
 ```sh
 cd /home/wapp/apps/review-api
-umask 077
-cp -n deploy/env.example .env
-openssl rand -hex 32
-nano .env
-sh deploy/deploy.sh
+sh pull.sh
 ```
 
-Запишите сгенерированный пароль в `DB_PASSWORD`, настоящий токен бота в
-`TELEGRAM_BOT_TOKEN`, домены в `APP_URL` и `APP_CORS_ORIGINS`.
-Не отправляйте секреты в чат и не коммитьте `.env`.
-Compose читает `.env`; не выполняйте его через `source`.
+Скрипт пересоздаёт API и worker из уже доставленного образа, применяет
+актуальный `.env` и ждёт готовности API. PostgreSQL и Redis не пересоздаются
+принудительно, данные хранятся в Docker volumes. Скрипт не скачивает исходники
+и не собирает образ на сервере. Любой другой пользователь, включая root,
+получит отказ. Проверка пользователя не защищает от администратора, который
+может изменить сам файл.
 
-API доступен только на `127.0.0.1:8080`. Настройте существующий nginx с HTTPS
-для домена API и `proxy_pass http://127.0.0.1:8080`.
-Не публикуйте `/metrics` через внешний reverse proxy.
-PostgreSQL и Redis доступны только внутри сети Compose; Redis без пароля,
-поэтому подключать посторонние контейнеры к этой сети нельзя.
+## Автодеплой
 
-API автоматически применяет встроенные Goose-миграции до старта HTTP.
-Worker запускается после успешной `/readyz`. Отдельный migrator предназначен
-для обслуживания: `docker compose --profile tools run --rm migrator`.
-Не запускайте миграции параллельно с деплоем.
+Push в `main` запускает `.github/workflows/deploy.yml`: форматирование,
+`go vet`, race-тесты, сборку Docker-образа на GitHub, доставку по SSH и вызов
+`pull.sh` с SHA нового релиза. Pull request запускает только проверки и сборку.
+Есть ручной запуск workflow для `main`.
 
-## Обновление и проверка
+GitHub Actions Secrets: `DEPLOY_SSH_KEY` — отдельный ключ `wapp`,
+`DEPLOY_KNOWN_HOSTS` — проверенные SSH host keys сервера.
+Токен бота и пароль БД остаются в серверном `.env`.
+Доступ к изменению `main` и workflow означает доступ к деплою.
 
-Обновите исходники до проверенного коммита. Установите `APP_VERSION` в `.env`
-в его SHA, чтобы сохранить предыдущий образ для отката, затем:
+Служебные файлы находятся в `/home/wapp/.local/share/review-api`:
+
+- `releases/<SHA>` — Compose и скрипт релиза;
+- `current` — ссылка на последний успешно запущенный релиз;
+- `incoming` — временные архивы доставки;
+- `deploy.lock` — общая блокировка ручного запуска и автодеплоя.
+
+Деплои последовательные. При неготовности API скрипт завершается ошибкой,
+worker остаётся остановленным; ссылка `current` не меняется. Это не
+zero-downtime деплой. Проверка worker подтверждает запуск процесса,
+успешность обработки outbox проверяйте в логах.
+
+## Проверка и откат
 
 ```sh
-sh deploy/deploy.sh
 curl --fail http://127.0.0.1:8080/readyz
-docker compose logs --tail=100 app worker
+docker --context rootless logs --tail=100 review-api-worker-1
 ```
 
-Скрипт сначала собирает образ, затем останавливает worker и обновляет API.
-Если API не готов, скрипт завершается ошибкой, worker остаётся остановленным.
-Это не zero-downtime деплой. Проверка worker подтверждает запуск процесса,
-но не успешную обработку outbox — проверяйте его логи.
+Откат на сохранённый совместимый образ:
 
-Перед миграциями делайте резервную копию PostgreSQL:
+```sh
+sh /home/wapp/apps/review-api/pull.sh <PREVIOUS_SHA>
+```
+
+Схема БД автоматически назад не откатывается. Перед несовместимыми
+миграциями нужен отдельный план восстановления. Сохраняйте предыдущие образы.
+
+Резервная копия БД от `wapp`:
 
 ```sh
 umask 077
-docker compose exec -T postgres pg_dump -U review -d review -Fc > "$HOME/backups/review-$(date +%Y%m%d-%H%M%S).dump"
+docker --context rootless exec review-api-postgres-1 pg_dump -U review -d review -Fc > "$HOME/backups/review-$(date +%Y%m%d-%H%M%S).dump"
 ```
 
 Копируйте резервные копии за пределы сервера и проверяйте восстановление.
 Не используйте `docker compose down -v`: это удалит данные.
 Изменение `DB_PASSWORD` в `.env` не меняет пароль уже созданной БД.
 
-Для отката выберите прежний `APP_VERSION` и совместимый compose.yaml,
-затем выполните `docker compose up -d --no-build --wait app worker`.
-Откат образа не откатывает схему БД; несовместимые миграции требуют отдельного
-плана восстановления. Не удаляйте предыдущие образы до проверки релиза.
+## Доступ без домена
 
-## Подключение review-hub-api.com
-
-Необязательный этап: пока домен не используется, установите
-`APP_URL=http://localhost:8080` и подключайтесь с компьютера через SSH-туннель:
+API слушает `127.0.0.1:8080`, базы не публикуют порты. На компьютере:
 
 ```sh
 ssh -N -L 8080:127.0.0.1:8080 -i ~/.ssh/my_server wapp@194.146.223.221
 ```
 
-Проверка на компьютере: `curl --fail http://localhost:8080/readyz`.
+Проверка: `curl --fail http://localhost:8080/readyz`.
+Для будущего домена подготовлен `deploy/nginx.conf`; требуется HTTPS.
 
-Направьте DNS A-запись домена на `194.146.223.221`. Если есть AAAA-запись,
-она также должна вести на этот сервер. Администратор выполняет:
+## Локальная сборка
 
-```sh
-sudo install -m 644 /home/wapp/apps/review-api/deploy/nginx.conf /etc/nginx/sites-available/review-hub-api.com
-sudo ln -s /etc/nginx/sites-available/review-hub-api.com /etc/nginx/sites-enabled/review-hub-api.com
-sudo nginx -t && sudo systemctl reload nginx
-sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d review-hub-api.com --redirect
-sudo certbot renew --dry-run
-```
-
-Откройте TCP 80/443 в firewall, сохранив доступ по SSH. Конфигурация nginx
-выше предназначена для первоначального выпуска сертификата; настройка
-завершена только после успешного HTTPS и проверки обновления сертификата.
+Из клона репозитория на Linux: создайте `.env` по `deploy/env.example`,
+заполните секреты и выполните `sh deploy/deploy.sh`.
+Production использует rootless Docker пользователя `wapp` с автозапуском
+user service и `loginctl enable-linger wapp`.

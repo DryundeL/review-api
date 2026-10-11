@@ -41,10 +41,10 @@ jobs:
       - name: Package release
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
-          mkdir -p "$RUNNER_TEMP/release/deploy"
+          mkdir -p "$RUNNER_TEMP/release"
           docker save "review-api:$GITHUB_SHA" | gzip > "$RUNNER_TEMP/release/image.tar.gz"
           cp compose.yaml "$RUNNER_TEMP/release/"
-          cp deploy/deploy.sh "$RUNNER_TEMP/release/deploy/"
+          cp deploy/pull.sh "$RUNNER_TEMP/release/"
           printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/release/.release-version"
           tar -czf "$RUNNER_TEMP/release.tar.gz" -C "$RUNNER_TEMP/release" .
       - name: Deploy to server
@@ -65,7 +65,7 @@ jobs:
             -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes
             -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
           target=wapp@194.146.223.221
-          ssh "${options[@]}" "$target" "mkdir -p /home/wapp/apps/review-api/incoming/$GITHUB_SHA"
+          ssh "${options[@]}" "$target" "mkdir -p /home/wapp/.local/share/review-api/incoming/$GITHUB_SHA"
           scp "${options[@]}" "$RUNNER_TEMP/release.tar.gz" \
-            "$target:/home/wapp/apps/review-api/incoming/$GITHUB_SHA/release.tar.gz"
+            "$target:/home/wapp/.local/share/review-api/incoming/$GITHUB_SHA/release.tar.gz"
           ssh "${options[@]}" "$target" "sh -s -- $GITHUB_SHA" < deploy/activate.sh

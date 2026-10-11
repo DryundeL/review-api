@@ -73,7 +73,7 @@ services:
     image: postgres:17-alpine
     command: [postgres, -p, "${DB_PORT:-5432}"]
     ports:
-      - "127.0.0.1:${DB_PORT:-5432}:${DB_PORT:-5432}"
+      - "0.0.0.0:${DB_PORT:-5432}:${DB_PORT:-5432}"
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:?Set DB_USER in .env}

@@ -117,8 +117,16 @@ func (a *App) handle(ctx context.Context, update Update) error {
 	if chatID == 0 {
 		return nil
 	}
-	text, markup := startMessage(profile, a.miniAppURL)
-	if err := a.client.SendMessage(ctx, chatID, text, markup); err != nil {
+	view := startMessage(profile, a.miniAppURL)
+	if err := a.client.SetChatMenuButton(ctx, chatID, view.MenuButton, a.miniAppURL); err != nil {
+		var api *APIError
+		if errors.As(err, &api) && !api.Temporary() {
+			a.log.Warn("menu button not set", "telegram_id", profile.TelegramID, "error", err)
+		} else {
+			return err
+		}
+	}
+	if err := a.client.SendMessage(ctx, chatID, view.Text, view.Markup); err != nil {
 		var api *APIError
 		if errors.As(err, &api) && !api.Temporary() {
 			a.log.Warn("start reply not delivered", "telegram_id", profile.TelegramID, "error", err)

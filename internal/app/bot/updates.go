@@ -11,10 +11,12 @@ import (
 )
 
 type replyMarkup struct {
-	InlineKeyboard [][]inlineButton `json:"inline_keyboard"`
+	Keyboard       [][]keyboardButton `json:"keyboard"`
+	ResizeKeyboard bool               `json:"resize_keyboard"`
+	IsPersistent   bool               `json:"is_persistent"`
 }
 
-type inlineButton struct {
+type keyboardButton struct {
 	Text   string     `json:"text"`
 	WebApp webAppInfo `json:"web_app"`
 }
@@ -64,7 +66,13 @@ func parseMiniAppURL(raw string) (string, error) {
 	return parsed.String(), nil
 }
 
-func startMessage(profile contract.TelegramProfile, appURL string) (string, replyMarkup) {
+type startView struct {
+	Text       string
+	Markup     replyMarkup
+	MenuButton string
+}
+
+func startMessage(profile contract.TelegramProfile, appURL string) startView {
 	ru := isRussian(profile.LanguageCode)
 	name := strings.TrimSpace(visibleText(profile.FirstName, 64) + " " + visibleText(profile.LastName, 64))
 	if name == "" {
@@ -105,15 +113,24 @@ func startMessage(profile contract.TelegramProfile, appURL string) (string, repl
 		text.WriteString("\nYour options are below.")
 	}
 
-	label := "Open mini app"
+	menuButton := "Open"
+	keyboardLabel := "Open menu"
 	if ru {
-		label = "Открыть мини-приложение"
+		menuButton = "Открыть"
+		keyboardLabel = "Открыть меню"
 	}
-	markup := replyMarkup{InlineKeyboard: [][]inlineButton{{{
-		Text:   label,
-		WebApp: webAppInfo{URL: appURL},
-	}}}}
-	return text.String(), markup
+	return startView{
+		Text: text.String(),
+		Markup: replyMarkup{
+			Keyboard: [][]keyboardButton{{{
+				Text:   keyboardLabel,
+				WebApp: webAppInfo{URL: appURL},
+			}}},
+			ResizeKeyboard: true,
+			IsPersistent:   true,
+		},
+		MenuButton: menuButton,
+	}
 }
 
 func isRussian(languageCode string) bool {

@@ -71,7 +71,7 @@ func TestStartCommandMentionAndGroupReply(t *testing.T) {
 func TestStartMessageKeepsMiniAppButton(t *testing.T) {
 	t.Parallel()
 	const appURL = "https://app.example.com/review"
-	text, markup := startMessage(contract.TelegramProfile{
+	view := startMessage(contract.TelegramProfile{
 		TelegramID:   42,
 		FirstName:    "Анна\n",
 		LastName:     "Иванова",
@@ -80,15 +80,21 @@ func TestStartMessageKeepsMiniAppButton(t *testing.T) {
 		IsPremium:    true,
 	}, appURL)
 	for _, part := range []string{"Привет, Анна Иванова (@anna).", "Telegram ID: 42", "Язык: ru", "Premium: да", "Твои возможности ниже."} {
-		if !strings.Contains(text, part) {
-			t.Fatalf("text %q does not contain %q", text, part)
+		if !strings.Contains(view.Text, part) {
+			t.Fatalf("text %q does not contain %q", view.Text, part)
 		}
 	}
-	if len(markup.InlineKeyboard) != 1 || len(markup.InlineKeyboard[0]) != 1 {
-		t.Fatalf("markup = %+v", markup)
+	if view.MenuButton != "Открыть" {
+		t.Fatalf("menu button = %q", view.MenuButton)
 	}
-	button := markup.InlineKeyboard[0][0]
-	if button.Text != "Открыть мини-приложение" || button.WebApp.URL != appURL {
+	if !view.Markup.ResizeKeyboard || !view.Markup.IsPersistent {
+		t.Fatalf("markup flags = %+v", view.Markup)
+	}
+	if len(view.Markup.Keyboard) != 1 || len(view.Markup.Keyboard[0]) != 1 {
+		t.Fatalf("markup = %+v", view.Markup)
+	}
+	button := view.Markup.Keyboard[0][0]
+	if button.Text != "Открыть меню" || button.WebApp.URL != appURL {
 		t.Fatalf("button = %+v", button)
 	}
 }

@@ -98,6 +98,20 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64) ([]Update, error)
 	return updates, nil
 }
 
+func (c *Client) SetChatMenuButton(ctx context.Context, chatID int64, text, appURL string) error {
+	if chatID <= 0 || text == "" || appURL == "" || utf8.RuneCountInString(text) > 32 {
+		return fmt.Errorf("telegram setChatMenuButton: invalid request")
+	}
+	return c.post(ctx, "setChatMenuButton", map[string]any{
+		"chat_id": chatID,
+		"menu_button": map[string]any{
+			"type":    "web_app",
+			"text":    text,
+			"web_app": webAppInfo{URL: appURL},
+		},
+	}, nil)
+}
+
 func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, markup any) error {
 	if chatID <= 0 || text == "" {
 		return fmt.Errorf("telegram sendMessage: invalid request")

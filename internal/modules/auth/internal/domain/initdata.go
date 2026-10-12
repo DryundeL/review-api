@@ -50,7 +50,7 @@ func (v *Validator) Validate(initData string) (contract.TelegramIdentity, error)
 
 	pairs := make([]string, 0, len(values))
 	for k, vs := range values {
-		if k == "hash" || k == "signature" {
+		if k == "hash" {
 			continue
 		}
 		if len(vs) == 0 {

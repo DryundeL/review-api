@@ -37,6 +37,28 @@ func TestValidator_ValidInitData(t *testing.T) {
 	}
 }
 
+func TestValidator_HashCoversSignature(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 9, 19, 16, 0, 0, 0, time.UTC)
+	v := domain.NewValidator(testToken, 24*time.Hour, func() time.Time { return now })
+	const sig = "zL-ucjNyREiHDE8aihFwpfR9aggP2xiAo3NSpfe-p7Ib"
+	user := `{"id":42,"first_name":"Ann"}`
+	authDate := strconv.FormatInt(now.Unix(), 10)
+	check := "auth_date=" + authDate + "\nquery_id=AAE\nsignature=" + sig + "\nuser=" + user
+	secret := hmacSHA256([]byte("WebAppData"), []byte(testToken))
+	fields := url.Values{}
+	fields.Set("auth_date", authDate)
+	fields.Set("query_id", "AAE")
+	fields.Set("signature", sig)
+	fields.Set("user", user)
+	fields.Set("hash", hex.EncodeToString(hmacSHA256(secret, []byte(check))))
+
+	id, err := v.Validate(fields.Encode())
+	if err != nil || id.TelegramID != 42 || id.FirstName != "Ann" {
+		t.Fatalf("id=%+v err=%v", id, err)
+	}
+}
+
 func TestValidator_BadHash(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()

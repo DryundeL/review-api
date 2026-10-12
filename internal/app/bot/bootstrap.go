@@ -8,12 +8,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
+	"review-api/internal/modules/auth"
 	"review-api/internal/modules/users"
 	"review-api/internal/modules/users/contract"
 	"review-api/internal/platform/config"
 	"review-api/internal/platform/database"
 	"review-api/internal/platform/observability"
+	redisx "review-api/internal/platform/redis"
 )
 
 const serviceName = "review-api-bot"
@@ -24,7 +27,9 @@ type userEnsurer interface {
 
 type App struct {
 	db         *pgxpool.Pool
+	redis      *redis.Client
 	users      userEnsurer
+	logins     loginGateway
 	client     *Client
 	log        *slog.Logger
 	miniAppURL string
@@ -46,9 +51,23 @@ func Bootstrap(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	rdb, err := redisx.Connect(ctx, cfg.Redis)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	authMod := auth.New(auth.Dependencies{
+		BotToken:    cfg.App.TelegramBotToken,
+		MaxAge:      cfg.App.AuthMaxAge,
+		Redis:       rdb,
+		JWTSecret:   cfg.App.JWTSecret,
+		BotUsername: cfg.App.TelegramBotUsername,
+	})
 	return &App{
 		db:         pool,
+		redis:      rdb,
 		users:      users.New(users.Dependencies{Pool: pool}),
+		logins:     authMod,
 		client:     NewClient(cfg.App.TelegramBotToken),
 		log:        observability.Logger(),
 		miniAppURL: miniAppURL,
@@ -57,6 +76,9 @@ func Bootstrap(ctx context.Context) (*App, error) {
 
 func (a *App) Run(ctx context.Context) error {
 	defer a.db.Close()
+	if a.redis != nil {
+		defer a.redis.Close()
+	}
 	a.log.Info("bot started", "service", serviceName)
 
 	var offset int64
@@ -102,6 +124,12 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) handle(ctx context.Context, update Update) error {
+	if update.CallbackQuery != nil {
+		return a.handleLoginCallback(ctx, update.CallbackQuery)
+	}
+	if id, ok := loginStartID(update); ok {
+		return a.handleLoginStart(ctx, update, id)
+	}
 	profile, chatID, ok := startProfile(update)
 	if !ok {
 		return nil

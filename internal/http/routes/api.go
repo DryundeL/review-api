@@ -7,11 +7,13 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	authmodule "review-api/internal/modules/auth"
+	usersmodule "review-api/internal/modules/users"
 	"review-api/internal/platform/ratelimit"
 )
 
 type APIModules struct {
-	Auth *authmodule.Module
+	Auth  *authmodule.Module
+	Users *usersmodule.Module
 }
 
 type APIOptions struct {
@@ -24,5 +26,8 @@ func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 	v1.Use(ratelimit.Middleware(opts.Redis, opts.RateLimitPerMin, time.Minute))
 	if modules.Auth != nil {
 		modules.Auth.RegisterHTTP(v1)
+	}
+	if modules.Users != nil {
+		modules.Users.RegisterHTTP(v1)
 	}
 }

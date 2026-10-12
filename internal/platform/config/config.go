@@ -52,18 +52,20 @@ func (c RedisConfig) Addr() string {
 }
 
 type AppConfig struct {
-	Env              string
-	Port             string
-	URL              string
-	Version          string
-	TelegramBotToken string
-	MiniAppURL       string
-	AuthMaxAge       time.Duration
-	RateLimitPerMin  int
-	CORSOrigins      []string
-	OTLPEndpoint     string
-	WorkerPoll       time.Duration
-	WorkerBatch      int
+	Env                 string
+	Port                string
+	URL                 string
+	Version             string
+	TelegramBotToken    string
+	TelegramBotUsername string
+	JWTSecret           string
+	MiniAppURL          string
+	AuthMaxAge          time.Duration
+	RateLimitPerMin     int
+	CORSOrigins         []string
+	OTLPEndpoint        string
+	WorkerPoll          time.Duration
+	WorkerBatch         int
 }
 
 func Load() (*Config, error) {
@@ -109,18 +111,20 @@ func Load() (*Config, error) {
 			DB:       redisDB,
 		},
 		App: AppConfig{
-			Env:              getEnv("APP_ENV", "development"),
-			Port:             getEnv("APP_PORT", "8080"),
-			URL:              getEnv("APP_URL", "http://localhost:8080"),
-			Version:          getEnv("APP_VERSION", "dev"),
-			TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
-			MiniAppURL:       os.Getenv("MINI_APP_URL"),
-			AuthMaxAge:       authMaxAge,
-			RateLimitPerMin:  rateLimit,
-			CORSOrigins:      parseCommaSeparatedList(os.Getenv("APP_CORS_ORIGINS")),
-			OTLPEndpoint:     os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
-			WorkerPoll:       workerPoll,
-			WorkerBatch:      workerBatch,
+			Env:                 getEnv("APP_ENV", "development"),
+			Port:                getEnv("APP_PORT", "8080"),
+			URL:                 getEnv("APP_URL", "http://localhost:8080"),
+			Version:             getEnv("APP_VERSION", "dev"),
+			TelegramBotToken:    os.Getenv("TELEGRAM_BOT_TOKEN"),
+			TelegramBotUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
+			JWTSecret:           os.Getenv("JWT_SECRET"),
+			MiniAppURL:          os.Getenv("MINI_APP_URL"),
+			AuthMaxAge:          authMaxAge,
+			RateLimitPerMin:     rateLimit,
+			CORSOrigins:         parseCommaSeparatedList(os.Getenv("APP_CORS_ORIGINS")),
+			OTLPEndpoint:        os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+			WorkerPoll:          workerPoll,
+			WorkerBatch:         workerBatch,
 		},
 	}
 
@@ -143,6 +147,12 @@ func (c *Config) Validate() error {
 	if c.App.TelegramBotToken == "" {
 		return fmt.Errorf("TELEGRAM_BOT_TOKEN is required")
 	}
+	if !validBotUsername(c.App.TelegramBotUsername) {
+		return fmt.Errorf("TELEGRAM_BOT_USERNAME is invalid")
+	}
+	if len(c.App.JWTSecret) < 32 || c.App.JWTSecret == c.App.TelegramBotToken {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters and differ from TELEGRAM_BOT_TOKEN")
+	}
 	if c.App.RateLimitPerMin < 1 {
 		return fmt.Errorf("RATE_LIMIT_PER_MIN must be >= 1")
 	}
@@ -155,6 +165,21 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("APP_ENV must be one of: development, staging, production")
 	}
 	return nil
+}
+
+func validBotUsername(name string) bool {
+	if len(name) < 5 || len(name) > 32 {
+		return false
+	}
+	for i, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		case i > 0 && ((r >= '0' && r <= '9') || r == '_'):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func getEnv(key, fallback string) string {

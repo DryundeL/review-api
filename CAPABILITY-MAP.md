@@ -13,7 +13,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | Module id | Тип | Responsibility | Depends on |
 |---|---|---|---|
 | platform | infra, не BC | pgx pool, Redis, Goose, outbox, eventbus, Echo, slog, OTel, Prometheus, health | — |
-| auth | BC | Проверка Telegram `initData` (HMAC + max age), `TelegramIdentity` в context, middleware | platform |
+| auth | BC | Вход из браузера через подтверждение в боте и JWT; проверка Telegram `initData` | platform |
 | users | BC | Профиль, аватар, `popularity_score`, EnsureUser по Telegram identity | auth (contract), media |
 | media | BC | Upload, magic-bytes, лимиты, S3-compatible, без SVG | auth |
 | catalog | BC | Произведения, типы-теги, обложка, `release_status`, поиск, создание UGC | auth, media, users |

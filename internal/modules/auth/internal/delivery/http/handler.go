@@ -13,10 +13,12 @@ import (
 
 type Handler struct {
 	validate *application.ValidateInitDataHandler
+	login    *application.LoginService
+	secret   []byte
 }
 
-func NewHandler(validate *application.ValidateInitDataHandler) *Handler {
-	return &Handler{validate: validate}
+func NewHandler(validate *application.ValidateInitDataHandler, login *application.LoginService, secret []byte) *Handler {
+	return &Handler{validate: validate, login: login, secret: secret}
 }
 
 func (h *Handler) Middleware(next echo.HandlerFunc) echo.HandlerFunc {

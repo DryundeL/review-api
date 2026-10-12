@@ -2,9 +2,11 @@
 
 ## Objective
 
-Единственная аутентификация Mini App: проверить Telegram `initData`, положить `TelegramIdentity` в request context. Паролей, JWT и SSO нет.
+Два входа.
 
-Пользователь API: Next.js Mini App шлёт `Authorization: tma <initData>` (или заголовок `X-Telegram-Init-Data`). Неаутентифицированные запросы — только health/metrics/openapi.
+Браузер: `POST /v1/auth/login` читает User-Agent и возвращает ссылку `https://t.me/<bot>?start=login_<id>`. Бот пишет человеку браузер и устройство и просит подтвердить. `POST /v1/auth/login/poll` с `{ "loginId" }` отдаёт тот же JWT, пока заявка жива. `GET /v1/profile` требует `Authorization: Bearer <jwt>`.
+
+Mini App: `Authorization: tma <initData>` на `GET /v1/auth/identity`. Паролей и SSO нет.
 
 ## Tech Stack
 
@@ -54,8 +56,8 @@ if err != nil {
 ## Boundaries
 
 - Always: не логировать сырой initData; не принимать initData из query на write-ручках.
-- Ask first: смена схемы заголовка, web login widget, бот-команды как второй auth.
-- Never: JWT, сессии с паролем, доверие `user` без HMAC.
+- Ask first: смена схемы заголовка, refresh-токены, отказ от initData.
+- Never: пароли, SSO, доверие `user` без HMAC или без подтверждения в боте. JWT только после подтверждения, секрет не равен токену бота.
 
 ## Success Criteria
 

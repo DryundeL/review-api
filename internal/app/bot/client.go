@@ -58,14 +58,23 @@ func NewClient(token string) *Client {
 }
 
 type Update struct {
-	UpdateID int64    `json:"update_id"`
-	Message  *Message `json:"message"`
+	UpdateID      int64          `json:"update_id"`
+	Message       *Message       `json:"message"`
+	CallbackQuery *CallbackQuery `json:"callback_query"`
+}
+
+type CallbackQuery struct {
+	ID      string   `json:"id"`
+	From    *User    `json:"from"`
+	Message *Message `json:"message"`
+	Data    string   `json:"data"`
 }
 
 type Message struct {
-	From *User  `json:"from"`
-	Chat Chat   `json:"chat"`
-	Text string `json:"text"`
+	MessageID int64  `json:"message_id"`
+	From      *User  `json:"from"`
+	Chat      Chat   `json:"chat"`
+	Text      string `json:"text"`
 }
 
 type Chat struct {
@@ -86,7 +95,7 @@ type User struct {
 func (c *Client) GetUpdates(ctx context.Context, offset int64) ([]Update, error) {
 	payload := map[string]any{
 		"timeout":         pollSeconds,
-		"allowed_updates": []string{"message"},
+		"allowed_updates": []string{"message", "callback_query"},
 	}
 	if offset > 0 {
 		payload["offset"] = offset
@@ -110,6 +119,34 @@ func (c *Client) SetChatMenuButton(ctx context.Context, chatID int64, text, appU
 			"web_app": webAppInfo{URL: appURL},
 		},
 	}, nil)
+}
+
+func (c *Client) EditMessage(ctx context.Context, chatID, messageID int64, text string) error {
+	if chatID <= 0 || messageID <= 0 || text == "" {
+		return fmt.Errorf("telegram editMessageText: invalid request")
+	}
+	return c.post(ctx, "editMessageText", map[string]any{
+		"chat_id":    chatID,
+		"message_id": messageID,
+		"text":       text,
+		"reply_markup": map[string]any{
+			"inline_keyboard": []any{},
+		},
+	}, nil)
+}
+
+func (c *Client) AnswerCallback(ctx context.Context, id, text string) error {
+	if id == "" || len(id) > 256 {
+		return fmt.Errorf("telegram answerCallbackQuery: invalid request")
+	}
+	payload := map[string]any{"callback_query_id": id}
+	if text != "" {
+		if utf8.RuneCountInString(text) > 200 {
+			text = string([]rune(text)[:200])
+		}
+		payload["text"] = text
+	}
+	return c.post(ctx, "answerCallbackQuery", payload, nil)
 }
 
 func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, markup any) error {

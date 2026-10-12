@@ -70,7 +70,7 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		Env:         cfg.App.Env,
 	})
 
-	routes.SetupAPIRoutes(router, routes.APIModules{Auth: modules.Auth}, routes.APIOptions{
+	routes.SetupAPIRoutes(router, routes.APIModules{Auth: modules.Auth, Users: modules.Users}, routes.APIOptions{
 		Redis:           rdb,
 		RateLimitPerMin: cfg.App.RateLimitPerMin,
 	})

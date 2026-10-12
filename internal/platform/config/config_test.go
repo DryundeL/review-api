@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -44,6 +45,11 @@ func TestValidateRequiresSecrets(t *testing.T) {
 		t.Fatal("expected telegram token error")
 	}
 	cfg.App.TelegramBotToken = "tok"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected jwt and bot username error")
+	}
+	cfg.App.JWTSecret = strings.Repeat("s", 32)
+	cfg.App.TelegramBotUsername = "review_bot"
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}

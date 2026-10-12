@@ -1,7 +1,9 @@
 # ADR-003: Auth через Telegram Mini App initData
 
 ## Status
-Accepted
+Accepted, browser login added 2026-10-13
+
+Браузерный вход: `POST /v1/auth/login` создаёт одноразовую ссылку в бота. Бот показывает браузер и устройство и просит подтвердить. После подтверждения poll отдаёт JWT (HS256, `JWT_SECRET`). `GET /v1/profile` требует `Authorization: Bearer`. initData на `/v1/auth/identity` остаётся для Mini App.
 
 ## Date
 2026-09-19

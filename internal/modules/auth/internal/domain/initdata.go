@@ -94,21 +94,27 @@ func (v *Validator) Validate(initData string) (contract.TelegramIdentity, error)
 	}
 	var user struct {
 		ID           int64  `json:"id"`
+		IsBot        bool   `json:"is_bot"`
 		Username     string `json:"username"`
 		LanguageCode string `json:"language_code"`
 		PhotoURL     string `json:"photo_url"`
 		FirstName    string `json:"first_name"`
+		LastName     string `json:"last_name"`
+		IsPremium    bool   `json:"is_premium"`
 	}
-	if err := json.Unmarshal([]byte(userJSON), &user); err != nil || user.ID == 0 {
+	if err := json.Unmarshal([]byte(userJSON), &user); err != nil || user.ID <= 0 || user.IsBot {
 		return contract.TelegramIdentity{}, contract.ErrUnauthorized
 	}
 
 	return contract.TelegramIdentity{
 		TelegramID:   user.ID,
+		IsBot:        user.IsBot,
 		Username:     user.Username,
 		LanguageCode: user.LanguageCode,
 		PhotoURL:     user.PhotoURL,
 		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		IsPremium:    user.IsPremium,
 	}, nil
 }
 

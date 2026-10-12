@@ -24,7 +24,8 @@ go run ./cmd/bot
 - `GET /healthz` — процесс жив
 - `GET /readyz` — PostgreSQL + Redis
 - `GET /metrics` — Prometheus
-- `POST /v1/auth/login` — начать вход из браузера, в ответе `url` на бота
+- `POST /v1/auth/telegram` — Mini App, `Authorization: tma <initData>`, сразу `token`
+- `POST /v1/auth/login` — вход из браузера, в ответе `url` на бота
 - `POST /v1/auth/login/poll` — `{ "loginId" }`, пока не придёт `token`
 - `GET /v1/profile` — `Authorization: Bearer <jwt>`
 - `GET /v1/auth/identity` — `Authorization: tma <initData>`

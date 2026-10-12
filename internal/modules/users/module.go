@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
+	authcontract "review-api/internal/modules/auth/contract"
 	"review-api/internal/modules/users/contract"
 	"review-api/internal/modules/users/internal/application/command"
 	"review-api/internal/modules/users/internal/application/query"
@@ -37,6 +38,22 @@ func (m *Module) Name() string { return "users" }
 
 func (m *Module) EnsureUser(ctx context.Context, profile contract.TelegramProfile) error {
 	return m.ensure.Handle(ctx, profile)
+}
+
+func (m *Module) EnsureIdentity(ctx context.Context, id authcontract.TelegramIdentity) error {
+	return m.EnsureUser(ctx, contract.TelegramProfile{
+		TelegramID:   id.TelegramID,
+		IsBot:        id.IsBot,
+		FirstName:    id.FirstName,
+		LastName:     id.LastName,
+		Username:     id.Username,
+		LanguageCode: id.LanguageCode,
+		IsPremium:    id.IsPremium,
+	})
+}
+
+func (m *Module) SetAuth(auth echo.MiddlewareFunc) {
+	m.auth = auth
 }
 
 func (m *Module) RegisterHTTP(g *echo.Group) {

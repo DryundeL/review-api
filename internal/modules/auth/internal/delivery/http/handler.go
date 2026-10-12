@@ -1,7 +1,9 @@
 package authhttp
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -15,10 +17,15 @@ type Handler struct {
 	validate *application.ValidateInitDataHandler
 	login    *application.LoginService
 	secret   []byte
+	maxAge   time.Duration
+	ensure   func(context.Context, contract.TelegramIdentity) error
 }
 
-func NewHandler(validate *application.ValidateInitDataHandler, login *application.LoginService, secret []byte) *Handler {
-	return &Handler{validate: validate, login: login, secret: secret}
+func NewHandler(validate *application.ValidateInitDataHandler, login *application.LoginService, secret []byte, maxAge time.Duration, ensure func(context.Context, contract.TelegramIdentity) error) *Handler {
+	if maxAge <= 0 {
+		maxAge = 24 * time.Hour
+	}
+	return &Handler{validate: validate, login: login, secret: secret, maxAge: maxAge, ensure: ensure}
 }
 
 func (h *Handler) Middleware(next echo.HandlerFunc) echo.HandlerFunc {

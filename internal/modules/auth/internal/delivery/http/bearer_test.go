@@ -20,7 +20,7 @@ func TestBearerAcceptsJWT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := NewHandler(nil, nil, secret)
+	h := NewHandler(nil, nil, secret, time.Hour, nil)
 	e := echo.New()
 	e.GET("/v1/profile", func(c echo.Context) error {
 		id, err := contract.IdentityFromContext(c.Request().Context())

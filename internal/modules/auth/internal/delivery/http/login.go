@@ -30,6 +30,34 @@ func (h *Handler) Bearer(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+func (h *Handler) Telegram(c echo.Context) error {
+	if h.validate == nil || len(h.secret) < 32 {
+		return errors.New("login unavailable")
+	}
+	initData, err := domain.ParseAuthorization(c.Request().Header.Get(echo.HeaderAuthorization))
+	if err != nil {
+		return httperr.Unauthorized("invalid authorization")
+	}
+	id, err := h.validate.Handle(initData)
+	if err != nil {
+		return httperr.Unauthorized("invalid init data")
+	}
+	if h.ensure != nil {
+		if err := h.ensure(c.Request().Context(), id); err != nil {
+			if errors.Is(err, contract.ErrUnauthorized) {
+				return httperr.Unauthorized("unauthorized")
+			}
+			return err
+		}
+	}
+	token, err := domain.SignJWT(h.secret, id.TelegramID, time.Now().Add(h.maxAge))
+	if err != nil {
+		return err
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, telegramResponse{Token: token})
+}
+
 func (h *Handler) StartLogin(c echo.Context) error {
 	if h.login == nil {
 		return errors.New("login unavailable")
@@ -76,6 +104,10 @@ func bearerToken(header string) (string, bool) {
 		return "", false
 	}
 	return token, true
+}
+
+type telegramResponse struct {
+	Token string `json:"token"`
 }
 
 type startLoginResponse struct {

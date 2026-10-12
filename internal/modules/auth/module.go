@@ -20,6 +20,7 @@ type Dependencies struct {
 	Redis       *redis.Client
 	JWTSecret   string
 	BotUsername string
+	EnsureUser  func(context.Context, contract.TelegramIdentity) error
 }
 
 type Middlewares struct {
@@ -40,7 +41,7 @@ func NewModule(deps Dependencies) *Module {
 	if deps.Redis != nil {
 		svc = application.NewLoginService(login.NewStore(deps.Redis), []byte(deps.JWTSecret), deps.BotUsername, deps.MaxAge)
 	}
-	h := authhttp.NewHandler(validate, svc, []byte(deps.JWTSecret))
+	h := authhttp.NewHandler(validate, svc, []byte(deps.JWTSecret), deps.MaxAge, deps.EnsureUser)
 	return &Module{
 		Middlewares: Middlewares{Auth: h.Middleware, Bearer: h.Bearer},
 		handler:     h,

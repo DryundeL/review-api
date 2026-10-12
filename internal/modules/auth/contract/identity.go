@@ -12,10 +12,13 @@ var (
 
 type TelegramIdentity struct {
 	TelegramID   int64
+	IsBot        bool
 	Username     string
 	LanguageCode string
 	PhotoURL     string
 	FirstName    string
+	LastName     string
+	IsPremium    bool
 }
 
 type ctxKey struct{}

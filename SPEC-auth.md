@@ -4,9 +4,11 @@
 
 Два входа.
 
-Браузер: `POST /v1/auth/login` читает User-Agent и возвращает ссылку `https://t.me/<bot>?start=login_<id>`. Бот пишет человеку браузер и устройство и просит подтвердить. `POST /v1/auth/login/poll` с `{ "loginId" }` отдаёт тот же JWT, пока заявка жива. `GET /v1/profile` требует `Authorization: Bearer <jwt>`.
+Mini App: `POST /v1/auth/telegram` с `Authorization: tma <initData>` сразу отдаёт JWT. Сообщение в бот не отправляется.
 
-Mini App: `Authorization: tma <initData>` на `GET /v1/auth/identity`. Паролей и SSO нет.
+Браузер: `POST /v1/auth/login` читает User-Agent и возвращает ссылку `https://t.me/<bot>?start=login_<id>`. Бот пишет человеку браузер и устройство и просит подтвердить. `POST /v1/auth/login/poll` с `{ "loginId" }` отдаёт тот же JWT, пока заявка жива.
+
+`GET /v1/profile` требует `Authorization: Bearer <jwt>`. `GET /v1/auth/identity` по-прежнему проверяет initData. Паролей и SSO нет.
 
 ## Tech Stack
 

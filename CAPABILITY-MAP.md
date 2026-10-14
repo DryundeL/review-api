@@ -16,8 +16,8 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | auth | BC | Вход из браузера через подтверждение в боте и JWT; проверка Telegram `initData` | platform |
 | users | BC | Профиль, аватар, `popularity_score`, EnsureUser по Telegram identity | auth (contract), media |
 | media | BC | Upload, magic-bytes, лимиты, S3-compatible, без SVG | auth |
-| catalog | BC | Произведения, типы-теги, обложка, `release_status`, поиск, создание UGC | auth, media, users |
-| reviews | BC | Черновик/публикация, JSON-тело, голоса, просмотры, primary type | catalog, media, users |
+| catalog | BC | Произведения (`works`): название, тип, год, обложка, `release_status`, поиск, создание пользователем | auth, media, users, reviews (коды типов) |
+| reviews | BC | Черновик/публикация, JSON-тело, голоса, просмотры. Справочник `review_types`. Статусы — конфиг модуля | catalog, media, users |
 | social | BC | Подписки | users |
 | feed | BC | Read-side лента: курсор, фильтр типов, режимы `following` / `popular` | reviews, social, users |
 | gamification | BC | Unlock'и, подсказки в ЛК. Consumer `ReviewPublished` | reviews, users |
@@ -54,7 +54,7 @@ platform → auth → users, media → catalog → reviews → social → feed, 
 - Аватарка за 3 разных `primary type`. Рамка аватара за все 13 типов.
 - Один опубликованный обзор на пару `(user, work)`. Правка — PATCH.
 - `primaryType` неизменяем после публикации.
-- Типы MVP (закрытый enum): `manga`, `manhwa`, `manhua`, `ranobe`, `comic`, `book`, `series`, `movie`, `dorama`, `anime_series`, `anime_movie`, `cartoon_series`, `cartoon_movie`.
+- Типы MVP, стартовый набор `review_types`: `manga`, `manhwa`, `manhua`, `light_novel`, `comic`, `book`, `series`, `movie`, `dorama`, `anime_series`, `anime_movie`, `cartoon_series`, `cartoon_movie`. Код `light_novel` — ранобэ, как в клиенте. Админ может добавить тип. Статусы публикации и релиза не расширяются через API.
 
 ## Вне скоупа
 

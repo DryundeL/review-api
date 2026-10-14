@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
@@ -50,6 +51,14 @@ func (m *Module) EnsureIdentity(ctx context.Context, id authcontract.TelegramIde
 		LanguageCode: id.LanguageCode,
 		IsPremium:    id.IsPremium,
 	})
+}
+
+func (m *Module) UserID(ctx context.Context, telegramID int64) (uuid.UUID, error) {
+	user, err := m.profile.Handle(ctx, telegramID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return user.ID, nil
 }
 
 func (m *Module) SetAuth(auth echo.MiddlewareFunc) {

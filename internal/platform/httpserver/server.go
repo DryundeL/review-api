@@ -58,6 +58,7 @@ func corsMiddleware(origins []string) echo.MiddlewareFunc {
 			echo.HeaderContentType,
 			echo.HeaderAccept,
 			echo.HeaderAuthorization,
+			AdminTokenHeader,
 		},
 		AllowMethods: []string{
 			http.MethodGet,

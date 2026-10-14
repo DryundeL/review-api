@@ -29,6 +29,14 @@ go run ./cmd/bot
 - `POST /v1/auth/login/poll` — `{ "loginId" }`, пока не придёт `token`
 - `GET /v1/profile` — `Authorization: Bearer <jwt>`
 - `GET /v1/auth/identity` — `Authorization: tma <initData>`
+- `GET /v1/review-types` — активные типы обзоров
+- `GET /v1/review-statuses` — фиксированные статусы публикации и релиза
+- `GET /v1/admin/review-types` — все типы, заголовок `X-Admin-Token`
+- `POST /v1/admin/review-types` — добавить тип, тот же заголовок
+- `PATCH /v1/admin/review-types/:code` — подпись, порядок, `isActive`, тот же заголовок
+- `GET /v1/works?q=&type=&limit=` — произведения
+- `GET /v1/works/:id`
+- `POST /v1/works` — создать произведение, `Authorization: Bearer <jwt>`
 
 ```
 go test ./...

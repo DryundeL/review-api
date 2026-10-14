@@ -7,13 +7,17 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	authmodule "review-api/internal/modules/auth"
+	catalogmodule "review-api/internal/modules/catalog"
+	reviewsmodule "review-api/internal/modules/reviews"
 	usersmodule "review-api/internal/modules/users"
 	"review-api/internal/platform/ratelimit"
 )
 
 type APIModules struct {
-	Auth  *authmodule.Module
-	Users *usersmodule.Module
+	Auth    *authmodule.Module
+	Users   *usersmodule.Module
+	Reviews *reviewsmodule.Module
+	Catalog *catalogmodule.Module
 }
 
 type APIOptions struct {
@@ -29,5 +33,11 @@ func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 	}
 	if modules.Users != nil {
 		modules.Users.RegisterHTTP(v1)
+	}
+	if modules.Reviews != nil {
+		modules.Reviews.RegisterHTTP(v1)
+	}
+	if modules.Catalog != nil {
+		modules.Catalog.RegisterHTTP(v1)
 	}
 }

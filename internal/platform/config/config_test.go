@@ -50,7 +50,15 @@ func TestValidateRequiresSecrets(t *testing.T) {
 	}
 	cfg.App.JWTSecret = strings.Repeat("s", 32)
 	cfg.App.TelegramBotUsername = "review_bot"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected admin token error")
+	}
+	cfg.App.AdminToken = strings.Repeat("a", 32)
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	cfg.App.AdminToken = cfg.App.JWTSecret
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected admin token to differ from jwt")
 	}
 }

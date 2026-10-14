@@ -66,6 +66,7 @@ type AppConfig struct {
 	OTLPEndpoint        string
 	WorkerPoll          time.Duration
 	WorkerBatch         int
+	AdminToken          string
 }
 
 func Load() (*Config, error) {
@@ -93,7 +94,6 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	cfg := &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -125,6 +125,7 @@ func Load() (*Config, error) {
 			OTLPEndpoint:        os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 			WorkerPoll:          workerPoll,
 			WorkerBatch:         workerBatch,
+			AdminToken:          os.Getenv("ADMIN_TOKEN"),
 		},
 	}
 
@@ -152,6 +153,9 @@ func (c *Config) Validate() error {
 	}
 	if len(c.App.JWTSecret) < 32 || c.App.JWTSecret == c.App.TelegramBotToken {
 		return fmt.Errorf("JWT_SECRET must be at least 32 characters and differ from TELEGRAM_BOT_TOKEN")
+	}
+	if len(c.App.AdminToken) < 32 || c.App.AdminToken == c.App.JWTSecret || c.App.AdminToken == c.App.TelegramBotToken {
+		return fmt.Errorf("ADMIN_TOKEN must be at least 32 characters and differ from JWT_SECRET and TELEGRAM_BOT_TOKEN")
 	}
 	if c.App.RateLimitPerMin < 1 {
 		return fmt.Errorf("RATE_LIMIT_PER_MIN must be >= 1")

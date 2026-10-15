@@ -8,33 +8,29 @@ import (
 	"review-api/internal/modules/catalog/internal/domain"
 )
 
-type Work struct {
-	ID            uuid.UUID
-	Title         string
-	PrimaryType   string
-	Types         []string
-	ReleaseYear   *int
-	CoverURL      string
-	ReleaseStatus string
-	Origin        string
-	CreatedBy     uuid.UUID
+type MediaObject struct {
+	ID             uuid.UUID
+	Title          string
+	Type           string
+	ReleaseYear    *int
+	PosterURL      string
+	ReleaseStatus  string
+	ExternalSource string
+	ExternalID     string
+	CreatedBy      *uuid.UUID
 }
 
 type Writer interface {
-	Save(ctx context.Context, work domain.Work) error
+	Save(ctx context.Context, item domain.MediaObject) error
 }
 
 type Reader interface {
-	Get(ctx context.Context, id uuid.UUID) (Work, error)
-	Search(ctx context.Context, query, typeCode string, limit int) ([]Work, error)
+	Get(ctx context.Context, id uuid.UUID) (MediaObject, error)
+	Search(ctx context.Context, query, typeCode string, limit int) ([]MediaObject, error)
 }
 
 type TypeChecker interface {
 	RequireActive(ctx context.Context, codes []string) error
-}
-
-type AuthorResolver interface {
-	UserID(ctx context.Context, telegramID int64) (uuid.UUID, error)
 }
 
 type Publisher interface {

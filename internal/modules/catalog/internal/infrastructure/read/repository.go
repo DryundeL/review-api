@@ -22,99 +22,82 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-func (r *Repository) Get(ctx context.Context, id uuid.UUID) (ports.Work, error) {
+func (r *Repository) Get(ctx context.Context, id uuid.UUID) (ports.MediaObject, error) {
 	if r == nil || r.pool == nil || id == uuid.Nil {
-		return ports.Work{}, contract.ErrNotFound
+		return ports.MediaObject{}, contract.ErrNotFound
 	}
 	const query = `
-		SELECT w.id, w.title, w.primary_type, w.release_year, w.cover_url, w.release_status, w.origin, w.created_by,
-			ARRAY(SELECT wt.type_code FROM work_types wt WHERE wt.work_id = w.id ORDER BY wt.type_code)
-		FROM works w
-		WHERE w.id = $1
+		SELECT id, title, type, release_year, poster_url, release_status,
+			external_source, external_id, created_by
+		FROM media_objects
+		WHERE id = $1
 	`
-	work, err := scanWork(r.pool.QueryRow(ctx, query, id))
+	item, err := scanItem(r.pool.QueryRow(ctx, query, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ports.Work{}, contract.ErrNotFound
+		return ports.MediaObject{}, contract.ErrNotFound
 	}
 	if err != nil {
-		return ports.Work{}, fmt.Errorf("get work: %w", err)
+		return ports.MediaObject{}, fmt.Errorf("get media object: %w", err)
 	}
-	return work, nil
+	return item, nil
 }
 
-func (r *Repository) Search(ctx context.Context, text, typeCode string, limit int) ([]ports.Work, error) {
+func (r *Repository) Search(ctx context.Context, text, typeCode string, limit int) ([]ports.MediaObject, error) {
 	if r == nil || r.pool == nil {
 		return nil, contract.ErrInvalid
 	}
 	const query = `
-		SELECT w.id, w.title, w.primary_type, w.release_year, w.cover_url, w.release_status, w.origin, w.created_by,
-			ARRAY(SELECT wt.type_code FROM work_types wt WHERE wt.work_id = w.id ORDER BY wt.type_code)
-		FROM works w
-		WHERE ($1::text = '' OR EXISTS (
-			SELECT 1 FROM work_types wt WHERE wt.work_id = w.id AND wt.type_code = $1
-		))
-		AND ($2::text = '' OR w.title ILIKE '%' || $2 || '%' ESCAPE '\')
-		ORDER BY w.created_at DESC
+		SELECT id, title, type, release_year, poster_url, release_status,
+			external_source, external_id, created_by
+		FROM media_objects
+		WHERE ($1::text = '' OR type = $1)
+		AND ($2::text = '' OR title ILIKE '%' || $2 || '%' ESCAPE '\')
+		ORDER BY created_at DESC
 		LIMIT $3
 	`
 	rows, err := r.pool.Query(ctx, query, typeCode, escapeLike(text), limit)
 	if err != nil {
-		return nil, fmt.Errorf("search works: %w", err)
+		return nil, fmt.Errorf("search media objects: %w", err)
 	}
 	defer rows.Close()
-	out := make([]ports.Work, 0)
+	out := make([]ports.MediaObject, 0)
 	for rows.Next() {
-		work, err := scanWork(rows)
+		item, err := scanItem(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan work: %w", err)
+			return nil, fmt.Errorf("scan media object: %w", err)
 		}
-		out = append(out, work)
+		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("search works: %w", err)
+		return nil, fmt.Errorf("search media objects: %w", err)
 	}
 	return out, nil
 }
 
-func scanWork(row pgx.Row) (ports.Work, error) {
-	var work ports.Work
+func scanItem(row pgx.Row) (ports.MediaObject, error) {
+	var item ports.MediaObject
 	var year *int
-	var cover *string
-	var types []string
+	var poster, source, externalID *string
+	var createdBy *uuid.UUID
 	err := row.Scan(
-		&work.ID, &work.Title, &work.PrimaryType, &year, &cover, &work.ReleaseStatus, &work.Origin, &work.CreatedBy, &types,
+		&item.ID, &item.Title, &item.Type, &year, &poster, &item.ReleaseStatus,
+		&source, &externalID, &createdBy,
 	)
 	if err != nil {
-		return ports.Work{}, err
+		return ports.MediaObject{}, err
 	}
-	work.ReleaseYear = year
-	if cover != nil {
-		work.CoverURL = *cover
+	item.ReleaseYear = year
+	if poster != nil {
+		item.PosterURL = *poster
 	}
-	work.Types = orderTypes(work.PrimaryType, types)
-	return work, nil
-}
-
-func orderTypes(primary string, types []string) []string {
-	if len(types) == 0 {
-		if primary == "" {
-			return []string{}
-		}
-		return []string{primary}
+	if source != nil {
+		item.ExternalSource = *source
 	}
-	rest := make([]string, 0, len(types))
-	hasPrimary := false
-	for _, code := range types {
-		if code == primary {
-			hasPrimary = true
-			continue
-		}
-		rest = append(rest, code)
+	if externalID != nil {
+		item.ExternalID = *externalID
 	}
-	if !hasPrimary {
-		return append([]string{primary}, rest...)
-	}
-	return append([]string{primary}, rest...)
+	item.CreatedBy = createdBy
+	return item, nil
 }
 
 func escapeLike(value string) string {

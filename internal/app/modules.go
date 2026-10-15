@@ -7,8 +7,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/google/uuid"
-
 	"review-api/internal/modules/auth"
 	authcontract "review-api/internal/modules/auth/contract"
 	"review-api/internal/modules/catalog"
@@ -45,15 +43,15 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		},
 	})
 	usersMod.SetAuth(authMod.Middlewares.Bearer)
+	admin := httpserver.AdminToken(cfg.App.AdminToken)
 	reviewsMod := reviews.New(reviews.Dependencies{
 		Pool:  pool,
-		Admin: httpserver.AdminToken(cfg.App.AdminToken),
+		Admin: admin,
 	})
 	catalogMod := catalog.New(catalog.Dependencies{
-		Pool:    pool,
-		Auth:    authMod.Middlewares.Bearer,
-		Types:   reviewTypes{reviews: reviewsMod},
-		Authors: userAuthors{users: usersMod},
+		Pool:  pool,
+		Admin: admin,
+		Types: reviewTypes{reviews: reviewsMod},
 	})
 	return Modules{Auth: authMod, Users: usersMod, Reviews: reviewsMod, Catalog: catalogMod}
 }
@@ -66,19 +64,7 @@ func (r reviewTypes) RequireActive(ctx context.Context, codes []string) error {
 	err := r.reviews.RequireActiveTypes(ctx, codes)
 	var field reviewscontract.FieldError
 	if errors.As(err, &field) {
-		return catalogcontract.FieldError{Field: "type"}
+		return catalogcontract.FieldError{Field: "type", Index: -1}
 	}
 	return err
-}
-
-type userAuthors struct {
-	users *users.Module
-}
-
-func (a userAuthors) UserID(ctx context.Context, telegramID int64) (uuid.UUID, error) {
-	id, err := a.users.UserID(ctx, telegramID)
-	if errors.Is(err, userscontract.ErrNotFound) {
-		return uuid.Nil, catalogcontract.ErrAuthorNotFound
-	}
-	return id, err
 }

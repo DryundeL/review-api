@@ -19,7 +19,7 @@ func (p *Publisher) Publish(ctx context.Context, eventName, aggregateID string, 
 	if p == nil || p.writer == nil {
 		return fmt.Errorf("outbox publisher is not configured")
 	}
-	msg, err := outbox.NewMessage(eventName, "work", aggregateID, payload)
+	msg, err := outbox.NewMessage(eventName, "media_object", aggregateID, payload)
 	if err != nil {
 		return err
 	}

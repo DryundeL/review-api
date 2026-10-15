@@ -16,7 +16,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | auth | BC | Вход из браузера через подтверждение в боте и JWT; проверка Telegram `initData` | platform |
 | users | BC | Профиль, аватар, `popularity_score`, EnsureUser по Telegram identity | auth (contract), media |
 | media | BC | Upload, magic-bytes, лимиты, S3-compatible, без SVG | auth |
-| catalog | BC | Произведения (`works`): название, тип, год, обложка, `release_status`, поиск, создание пользователем | auth, media, users, reviews (коды типов) |
+| catalog | BC | Тайтлы (`media_objects`): название, type, год, poster, `release_status`, поиск; пакетный импорт только admin | auth, media, reviews (коды типов) |
 | reviews | BC | Черновик/публикация, JSON-тело, голоса, просмотры. Справочник `review_types`. Статусы — конфиг модуля | catalog, media, users |
 | social | BC | Подписки | users |
 | feed | BC | Read-side лента: курсор, фильтр типов, режимы `following` / `popular` | reviews, social, users |
@@ -41,7 +41,7 @@ platform → auth → users, media → catalog → reviews → social → feed, 
 | `review.voted` | reviews | feed, users, notifications |
 | `review.viewed` | reviews | feed (батч, не каждый хит) |
 | `user.followed` | social | feed, notifications |
-| `work.created` | catalog | — (аудит/поиск) |
+| `media_object.created` | catalog | — (аудит/поиск) |
 | `unlock.granted` | gamification | notifications, users |
 
 Синхронно между BC — только `contract` (чтение, ACL). Side effects после write — только outbox в той же TX, что aggregate.
@@ -51,9 +51,9 @@ platform → auth → users, media → catalog → reviews → social → feed, 
 - Лента: два режима `following` и `popular`, фильтр типов в обоих. Курсор, page size 10.
 - `release_status` принадлежит `catalog` (произведение). Обзор предлагает обновление.
 - Без веб-скрапинга. Позже AniList/TMDB в то же поле.
-- Аватарка за 3 разных `primary type`. Рамка аватара за все 13 типов.
-- Один опубликованный обзор на пару `(user, work)`. Правка — PATCH.
-- `primaryType` неизменяем после публикации.
+- Аватарка за 3 разных type. Рамка аватара за все 13 типов.
+- Один опубликованный обзор на пару `(user, media_object)`. Правка — PATCH.
+- `type` тайтла задаётся при импорте и не меняется через публичный API.
 - Типы MVP, стартовый набор `review_types`: `manga`, `manhwa`, `manhua`, `light_novel`, `comic`, `book`, `series`, `movie`, `dorama`, `anime_series`, `anime_movie`, `cartoon_series`, `cartoon_movie`. Код `light_novel` — ранобэ, как в клиенте. Админ может добавить тип. Статусы публикации и релиза не расширяются через API.
 
 ## Вне скоупа

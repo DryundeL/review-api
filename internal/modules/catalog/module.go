@@ -3,7 +3,6 @@ package catalog
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
@@ -22,32 +21,32 @@ type TypeChecker interface {
 	RequireActive(ctx context.Context, codes []string) error
 }
 
-type AuthorResolver interface {
-	UserID(ctx context.Context, telegramID int64) (uuid.UUID, error)
-}
-
 type Dependencies struct {
-	Pool    *pgxpool.Pool
-	Auth    echo.MiddlewareFunc
-	Types   TypeChecker
-	Authors AuthorResolver
+	Pool  *pgxpool.Pool
+	Admin echo.MiddlewareFunc
+	Types TypeChecker
 }
 
 type Module struct {
-	create *command.CreateWorkHandler
-	get    *query.GetWorkHandler
-	search *query.SearchWorksHandler
-	auth   echo.MiddlewareFunc
+	importBatch *command.ImportMediaObjectsHandler
+	get         *query.GetMediaObjectHandler
+	search      *query.SearchMediaObjectsHandler
+	admin       echo.MiddlewareFunc
 }
 
 func New(deps Dependencies) *Module {
 	reader := read.NewRepository(deps.Pool)
 	writer := write.NewRepository(deps.Pool)
 	return &Module{
-		create: command.NewCreateWorkHandler(writer, transaction.NewPgxManager(deps.Pool), typeBridge{deps.Types}, authorBridge{deps.Authors}, outboxpub.New(outbox.NewStore(deps.Pool))),
-		get:    query.NewGetWorkHandler(reader),
-		search: query.NewSearchWorksHandler(reader),
-		auth:   deps.Auth,
+		importBatch: command.NewImportMediaObjectsHandler(
+			writer,
+			transaction.NewPgxManager(deps.Pool),
+			typeBridge{deps.Types},
+			outboxpub.New(outbox.NewStore(deps.Pool)),
+		),
+		get:    query.NewGetMediaObjectHandler(reader),
+		search: query.NewSearchMediaObjectsHandler(reader),
+		admin:  deps.Admin,
 	}
 }
 
@@ -55,22 +54,13 @@ type typeBridge struct{ next TypeChecker }
 
 func (b typeBridge) RequireActive(ctx context.Context, codes []string) error {
 	if b.next == nil {
-		return contract.FieldError{Field: "type"}
+		return contract.FieldError{Field: "type", Index: -1}
 	}
 	return b.next.RequireActive(ctx, codes)
-}
-
-type authorBridge struct{ next AuthorResolver }
-
-func (b authorBridge) UserID(ctx context.Context, telegramID int64) (uuid.UUID, error) {
-	if b.next == nil {
-		return uuid.Nil, contract.ErrAuthorNotFound
-	}
-	return b.next.UserID(ctx, telegramID)
 }
 
 func (m *Module) Name() string { return "catalog" }
 
 func (m *Module) RegisterHTTP(g *echo.Group) {
-	cataloghttp.Register(g, cataloghttp.NewHandler(m.create, m.get, m.search), m.auth)
+	cataloghttp.Register(g, cataloghttp.NewHandler(m.importBatch, m.get, m.search), m.admin)
 }

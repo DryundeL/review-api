@@ -6,15 +6,15 @@ import (
 	"review-api/internal/http/httperr"
 )
 
-func Register(g *echo.Group, h *Handler, auth echo.MiddlewareFunc) {
-	g.GET("/works", h.Search)
-	g.GET("/works/:id", h.Get)
-	if auth == nil {
-		auth = func(next echo.HandlerFunc) echo.HandlerFunc {
+func Register(g *echo.Group, h *Handler, admin echo.MiddlewareFunc) {
+	g.GET("/media-objects", h.Search)
+	g.GET("/media-objects/:id", h.Get)
+	if admin == nil {
+		admin = func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(echo.Context) error {
 				return httperr.Unauthorized("unauthorized")
 			}
 		}
 	}
-	g.POST("/works", h.Create, auth)
+	g.POST("/admin/media-objects/import", h.Import, admin)
 }

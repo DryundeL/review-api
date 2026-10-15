@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	authcontract "review-api/internal/modules/auth/contract"
 	"review-api/internal/modules/catalog/contract"
 	"review-api/internal/modules/catalog/internal/application/command"
 	"review-api/internal/modules/catalog/internal/application/ports"
@@ -28,43 +27,29 @@ func (memTx) WithinTransaction(ctx context.Context, fn func(context.Context) err
 
 type memWriter struct{}
 
-func (memWriter) Save(context.Context, domain.Work) error { return nil }
+func (memWriter) Save(context.Context, domain.MediaObject) error { return nil }
 
 type memTypes struct{}
 
 func (memTypes) RequireActive(context.Context, []string) error { return nil }
 
-type memAuthors struct{}
-
-func (memAuthors) UserID(context.Context, int64) (uuid.UUID, error) {
-	return uuid.MustParse("33333333-3333-3333-3333-333333333333"), nil
-}
-
 type memPublisher struct{}
 
 func (memPublisher) Publish(context.Context, string, string, any) error { return nil }
 
-func TestCreateRequiresAuthAndRejectsBadCover(t *testing.T) {
+func TestImportRequiresAdminAndRejectsBadPoster(t *testing.T) {
 	t.Parallel()
 	h := NewHandler(
-		command.NewCreateWorkHandler(memWriter{}, memTx{}, memTypes{}, memAuthors{}, memPublisher{}),
-		query.NewGetWorkHandler(missingWorks{}),
-		query.NewSearchWorksHandler(missingWorks{}),
+		command.NewImportMediaObjectsHandler(memWriter{}, memTx{}, memTypes{}, memPublisher{}),
+		query.NewGetMediaObjectHandler(missingItems{}),
+		query.NewSearchMediaObjectsHandler(missingItems{}),
 	)
 	e := echo.New()
 	e.HTTPErrorHandler = httpserver.ErrorHandler
-	Register(e.Group("/v1"), h, func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			if c.Request().Header.Get("Authorization") == "" {
-				return next(c)
-			}
-			ctx := authcontract.WithIdentity(c.Request().Context(), authcontract.TelegramIdentity{TelegramID: 7})
-			c.SetRequest(c.Request().WithContext(ctx))
-			return next(c)
-		}
-	})
+	token := strings.Repeat("a", 32)
+	Register(e.Group("/v1"), h, httpserver.AdminToken(token))
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/works", strings.NewReader(`{"title":"Фильм","primaryType":"movie","releaseStatus":"completed"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/media-objects/import", strings.NewReader(`{"items":[{"title":"Фильм","type":"movie","releaseStatus":"completed"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
@@ -72,38 +57,61 @@ func TestCreateRequiresAuthAndRejectsBadCover(t *testing.T) {
 		t.Fatalf("status %d", rec.Code)
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/works", strings.NewReader(`{"title":"Фильм","primaryType":"movie","releaseStatus":"completed","coverUrl":"https://10.0.0.1/a.jpg"}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/admin/media-objects/import", strings.NewReader(`{"items":[{"title":"Фильм","type":"movie","releaseStatus":"completed","posterUrl":"https://10.0.0.1/a.jpg"}]}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set(httpserver.AdminTokenHeader, token)
 	rec = httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/works", strings.NewReader(`{"title":"Фильм","primaryType":"movie","releaseStatus":"completed"}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/admin/media-objects/import", strings.NewReader(`{"items":[{"title":"Фильм","type":"movie","releaseStatus":"completed"}]}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set(httpserver.AdminTokenHeader, token)
 	rec = httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
-	var body workJSON
+	var body importResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Origin != "user" || body.PrimaryType != "movie" || body.CreatedBy != "33333333-3333-3333-3333-333333333333" {
+	if body.Count != 1 || len(body.Items) != 1 || body.Items[0].Type != "movie" {
 		t.Fatalf("body = %+v", body)
 	}
 }
 
-type missingWorks struct{}
+func TestImportCSV(t *testing.T) {
+	t.Parallel()
+	h := NewHandler(
+		command.NewImportMediaObjectsHandler(memWriter{}, memTx{}, memTypes{}, memPublisher{}),
+		query.NewGetMediaObjectHandler(missingItems{}),
+		query.NewSearchMediaObjectsHandler(missingItems{}),
+	)
+	e := echo.New()
+	e.HTTPErrorHandler = httpserver.ErrorHandler
+	token := strings.Repeat("b", 32)
+	Register(e.Group("/v1"), h, httpserver.AdminToken(token))
 
-func (missingWorks) Get(context.Context, uuid.UUID) (ports.Work, error) {
-	return ports.Work{}, contract.ErrNotFound
+	csvBody := "title,type,release_status,release_year,poster_url\nМатрица,movie,completed,1999,https://cdn.example/p.jpg\n"
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/media-objects/import", strings.NewReader(csvBody))
+	req.Header.Set("Content-Type", "text/csv")
+	req.Header.Set(httpserver.AdminTokenHeader, token)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
 }
 
-func (missingWorks) Search(context.Context, string, string, int) ([]ports.Work, error) {
+type missingItems struct{}
+
+func (missingItems) Get(context.Context, uuid.UUID) (ports.MediaObject, error) {
+	return ports.MediaObject{}, contract.ErrNotFound
+}
+
+func (missingItems) Search(context.Context, string, string, int) ([]ports.MediaObject, error) {
 	return nil, nil
 }

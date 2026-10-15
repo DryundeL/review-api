@@ -34,9 +34,9 @@ go run ./cmd/bot
 - `GET /v1/admin/review-types` — все типы, заголовок `X-Admin-Token`
 - `POST /v1/admin/review-types` — добавить тип, тот же заголовок
 - `PATCH /v1/admin/review-types/:code` — подпись, порядок, `isActive`, тот же заголовок
-- `GET /v1/works?q=&type=&limit=` — произведения
-- `GET /v1/works/:id`
-- `POST /v1/works` — создать произведение, `Authorization: Bearer <jwt>`
+- `GET /v1/media-objects?q=&type=&limit=` — тайтлы каталога
+- `GET /v1/media-objects/:id`
+- `POST /v1/admin/media-objects/import` — пакетный импорт JSON или CSV, заголовок `X-Admin-Token`
 
 ```
 go test ./...

@@ -1,15 +1,17 @@
 package cataloghttp
 
 import (
+	"encoding/csv"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"review-api/internal/http/httperr"
-	authcontract "review-api/internal/modules/auth/contract"
 	"review-api/internal/modules/catalog/contract"
 	"review-api/internal/modules/catalog/internal/application/command"
 	"review-api/internal/modules/catalog/internal/application/ports"
@@ -18,13 +20,13 @@ import (
 )
 
 type Handler struct {
-	create *command.CreateWorkHandler
-	get    *query.GetWorkHandler
-	search *query.SearchWorksHandler
+	importBatch *command.ImportMediaObjectsHandler
+	get         *query.GetMediaObjectHandler
+	search      *query.SearchMediaObjectsHandler
 }
 
-func NewHandler(create *command.CreateWorkHandler, get *query.GetWorkHandler, search *query.SearchWorksHandler) *Handler {
-	return &Handler{create: create, get: get, search: search}
+func NewHandler(importBatch *command.ImportMediaObjectsHandler, get *query.GetMediaObjectHandler, search *query.SearchMediaObjectsHandler) *Handler {
+	return &Handler{importBatch: importBatch, get: get, search: search}
 }
 
 func (h *Handler) Search(c echo.Context) error {
@@ -32,7 +34,7 @@ func (h *Handler) Search(c echo.Context) error {
 	if raw := c.QueryParam("limit"); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil {
-			return invalid("limit")
+			return invalid("limit", -1)
 		}
 		limit = parsed
 	}
@@ -40,102 +42,199 @@ func (h *Handler) Search(c echo.Context) error {
 	if err != nil {
 		return mapError(err)
 	}
-	return c.JSON(http.StatusOK, listResponse{Items: worksResponse(items)})
+	return c.JSON(http.StatusOK, listResponse{Items: itemsResponse(items)})
 }
 
 func (h *Handler) Get(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		return httperr.New(http.StatusNotFound, "NOT_FOUND", "work not found")
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "media object not found")
 	}
-	work, err := h.get.Handle(c.Request().Context(), id)
+	item, err := h.get.Handle(c.Request().Context(), id)
 	if err != nil {
 		return mapError(err)
 	}
-	return c.JSON(http.StatusOK, workResponse(work))
+	return c.JSON(http.StatusOK, itemResponse(item))
 }
 
-func (h *Handler) Create(c echo.Context) error {
-	id, err := authcontract.IdentityFromContext(c.Request().Context())
+func (h *Handler) Import(c echo.Context) error {
+	drafts, err := parseImportBody(c)
 	if err != nil {
-		return httperr.Unauthorized("unauthorized")
+		return err
 	}
-	var body createBody
-	if err := c.Bind(&body); err != nil {
-		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
-	}
-	work, err := h.create.Handle(c.Request().Context(), id.TelegramID, domain.Draft{
-		Title:         body.Title,
-		PrimaryType:   body.PrimaryType,
-		Types:         body.Types,
-		ReleaseYear:   body.ReleaseYear,
-		CoverURL:      body.CoverURL,
-		ReleaseStatus: body.ReleaseStatus,
-	})
+	items, err := h.importBatch.Handle(c.Request().Context(), drafts)
 	if err != nil {
 		return mapError(err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
-	return c.JSON(http.StatusCreated, workResponse(work))
+	return c.JSON(http.StatusCreated, importResponse{Items: itemsResponse(items), Count: len(items)})
 }
 
-type createBody struct {
-	Title         string   `json:"title"`
-	PrimaryType   string   `json:"primaryType"`
-	Types         []string `json:"types"`
-	ReleaseYear   *int     `json:"releaseYear"`
-	CoverURL      string   `json:"coverUrl"`
-	ReleaseStatus string   `json:"releaseStatus"`
+func parseImportBody(c echo.Context) ([]domain.Draft, error) {
+	ct := c.Request().Header.Get(echo.HeaderContentType)
+	switch {
+	case strings.HasPrefix(ct, echo.MIMEApplicationJSON):
+		var body importJSONBody
+		if err := c.Bind(&body); err != nil {
+			return nil, httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+		}
+		return body.Items, nil
+	case strings.HasPrefix(ct, "text/csv"):
+		return parseCSV(c.Request().Body)
+	default:
+		return nil, httperr.New(http.StatusUnsupportedMediaType, "VALIDATION_ERROR", "unsupported content type")
+	}
 }
 
-type workJSON struct {
-	ID            string   `json:"id"`
-	Title         string   `json:"title"`
-	PrimaryType   string   `json:"primaryType"`
-	Types         []string `json:"types"`
-	ReleaseYear   *int     `json:"releaseYear,omitempty"`
-	CoverURL      string   `json:"coverUrl,omitempty"`
-	ReleaseStatus string   `json:"releaseStatus"`
-	Origin        string   `json:"origin"`
-	CreatedBy     string   `json:"createdBy"`
+func parseCSV(r io.Reader) ([]domain.Draft, error) {
+	reader := csv.NewReader(r)
+	reader.ReuseRecord = true
+	header, err := reader.Read()
+	if err != nil {
+		return nil, invalid("items", -1)
+	}
+	col, err := csvColumns(header)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Draft, 0)
+	for {
+		rec, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, invalid("items", -1)
+		}
+		draft, err := draftFromCSV(rec, col)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, draft)
+	}
+	return out, nil
+}
+
+type csvCol struct {
+	title, typ, year, poster, status, source, externalID int
+}
+
+func csvColumns(header []string) (csvCol, error) {
+	idx := map[string]int{}
+	for i, name := range header {
+		idx[strings.TrimSpace(strings.ToLower(name))] = i
+	}
+	required := []string{"title", "type", "release_status"}
+	for _, name := range required {
+		if _, ok := idx[name]; !ok {
+			return csvCol{}, invalid("items", -1)
+		}
+	}
+	col := csvCol{
+		title: idx["title"], typ: idx["type"], status: idx["release_status"],
+		year: -1, poster: -1, source: -1, externalID: -1,
+	}
+	if i, ok := idx["release_year"]; ok {
+		col.year = i
+	}
+	if i, ok := idx["poster_url"]; ok {
+		col.poster = i
+	}
+	if i, ok := idx["external_source"]; ok {
+		col.source = i
+	}
+	if i, ok := idx["external_id"]; ok {
+		col.externalID = i
+	}
+	return col, nil
+}
+
+func draftFromCSV(rec []string, col csvCol) (domain.Draft, error) {
+	get := func(i int) string {
+		if i < 0 || i >= len(rec) {
+			return ""
+		}
+		return strings.TrimSpace(rec[i])
+	}
+	draft := domain.Draft{
+		Title:          get(col.title),
+		Type:           get(col.typ),
+		PosterURL:      get(col.poster),
+		ReleaseStatus:  get(col.status),
+		ExternalSource: get(col.source),
+		ExternalID:     get(col.externalID),
+	}
+	if raw := get(col.year); raw != "" {
+		year, err := strconv.Atoi(raw)
+		if err != nil {
+			return domain.Draft{}, invalid("releaseYear", -1)
+		}
+		draft.ReleaseYear = &year
+	}
+	return draft, nil
+}
+
+type importJSONBody struct {
+	Items []domain.Draft `json:"items"`
+}
+
+type itemJSON struct {
+	ID             string  `json:"id"`
+	Title          string  `json:"title"`
+	Type           string  `json:"type"`
+	ReleaseYear    *int    `json:"releaseYear,omitempty"`
+	PosterURL      string  `json:"posterUrl,omitempty"`
+	ReleaseStatus  string  `json:"releaseStatus"`
+	ExternalSource string  `json:"externalSource,omitempty"`
+	ExternalID     string  `json:"externalId,omitempty"`
+	CreatedBy      *string `json:"createdBy,omitempty"`
 }
 
 type listResponse struct {
-	Items []workJSON `json:"items"`
+	Items []itemJSON `json:"items"`
 }
 
-func worksResponse(items []ports.Work) []workJSON {
-	out := make([]workJSON, 0, len(items))
+type importResponse struct {
+	Items []itemJSON `json:"items"`
+	Count int        `json:"count"`
+}
+
+func itemsResponse(items []ports.MediaObject) []itemJSON {
+	out := make([]itemJSON, 0, len(items))
 	for _, item := range items {
-		out = append(out, workResponse(item))
+		out = append(out, itemResponse(item))
 	}
 	return out
 }
 
-func workResponse(item ports.Work) workJSON {
-	types := item.Types
-	if types == nil {
-		types = []string{}
+func itemResponse(item ports.MediaObject) itemJSON {
+	out := itemJSON{
+		ID:             item.ID.String(),
+		Title:          item.Title,
+		Type:           item.Type,
+		ReleaseYear:    item.ReleaseYear,
+		PosterURL:      item.PosterURL,
+		ReleaseStatus:  item.ReleaseStatus,
+		ExternalSource: item.ExternalSource,
+		ExternalID:     item.ExternalID,
 	}
-	return workJSON{
-		ID:            item.ID.String(),
-		Title:         item.Title,
-		PrimaryType:   item.PrimaryType,
-		Types:         types,
-		ReleaseYear:   item.ReleaseYear,
-		CoverURL:      item.CoverURL,
-		ReleaseStatus: item.ReleaseStatus,
-		Origin:        item.Origin,
-		CreatedBy:     item.CreatedBy.String(),
+	if item.CreatedBy != nil {
+		s := item.CreatedBy.String()
+		out.CreatedBy = &s
 	}
+	return out
 }
 
-func invalid(field string) error {
+func invalid(field string, index int) error {
+	details := map[string]any{"field": field}
+	if index >= 0 {
+		details["index"] = index
+	}
 	return &httperr.Error{
 		Status:  http.StatusUnprocessableEntity,
 		Code:    "VALIDATION_ERROR",
-		Message: "invalid work",
-		Details: map[string]string{"field": field},
+		Message: "invalid media object",
+		Details: details,
 	}
 }
 
@@ -143,13 +242,11 @@ func mapError(err error) error {
 	var field contract.FieldError
 	switch {
 	case errors.As(err, &field):
-		return invalid(field.Field)
+		return invalid(field.Field, field.Index)
 	case errors.Is(err, contract.ErrNotFound):
-		return httperr.New(http.StatusNotFound, "NOT_FOUND", "work not found")
-	case errors.Is(err, contract.ErrAuthorNotFound):
-		return httperr.Unauthorized("unauthorized")
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "media object not found")
 	case errors.Is(err, contract.ErrInvalid):
-		return httperr.New(http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid work")
+		return httperr.New(http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid media object")
 	default:
 		return err
 	}

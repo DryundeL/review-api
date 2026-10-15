@@ -21,28 +21,33 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-func (r *Repository) Save(ctx context.Context, work domain.Work) error {
-	const insertWork = `
-		INSERT INTO works (
-			id, title, primary_type, release_year, cover_url, release_status, origin, created_by
+func (r *Repository) Save(ctx context.Context, item domain.MediaObject) error {
+	const insert = `
+		INSERT INTO media_objects (
+			id, title, type, release_year, poster_url, release_status,
+			external_source, external_id, created_by
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
 	`
-	var cover any
-	if work.CoverURL != "" {
-		cover = work.CoverURL
+	var poster any
+	if item.PosterURL != "" {
+		poster = item.PosterURL
 	}
-	if err := r.exec(ctx, insertWork,
-		work.ID, work.Title, work.PrimaryType, work.ReleaseYear, cover, work.ReleaseStatus, work.Origin, work.CreatedBy,
+	var source, externalID any
+	if item.ExternalSource != "" {
+		source = item.ExternalSource
+		externalID = item.ExternalID
+	}
+	var createdBy any
+	if item.CreatedBy != nil {
+		createdBy = *item.CreatedBy
+	}
+	if err := r.exec(ctx, insert,
+		item.ID, item.Title, item.Type, item.ReleaseYear, poster, item.ReleaseStatus,
+		source, externalID, createdBy,
 	); err != nil {
 		return mapWriteError(err)
-	}
-	const insertType = `INSERT INTO work_types (work_id, type_code) VALUES ($1, $2)`
-	for _, code := range work.Types {
-		if err := r.exec(ctx, insertType, work.ID, code); err != nil {
-			return mapWriteError(err)
-		}
 	}
 	return nil
 }
@@ -66,13 +71,12 @@ func mapWriteError(err error) error {
 	}
 	switch pgErr.Code {
 	case "23503":
-		if pgErr.ConstraintName == "works_created_by_fkey" {
-			return contract.ErrAuthorNotFound
-		}
-		return contract.FieldError{Field: "type"}
+		return contract.FieldError{Field: "type", Index: -1}
+	case "23505":
+		return contract.FieldError{Field: "external", Index: -1}
 	case "23514":
-		return contract.FieldError{Field: "body"}
+		return contract.FieldError{Field: "body", Index: -1}
 	default:
-		return fmt.Errorf("save work: %w", err)
+		return fmt.Errorf("save media object: %w", err)
 	}
 }

@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	maxTitleLen       = 200
-	maxPosterLen      = 2048
-	maxExternalLen    = 128
-	minYear           = 1800
-	maxYear           = 2100
-	maxImportBatch    = 500
+	maxTitleLen    = 200
+	maxPosterLen   = 2048
+	maxExternalLen = 128
+	minYear        = 1800
+	maxYear        = 2100
+	maxImportBatch = 500
 )
 
 var typeCode = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)

@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -51,10 +52,14 @@ func (h *CreateReviewHandler) Handle(ctx context.Context, authorID uuid.UUID, dr
 
 func toPortReview(item domain.Review) ports.Review {
 	blocks := make([]ports.Block, 0, len(item.Blocks))
+	hasSpoilers := false
 	for _, b := range item.Blocks {
 		blocks = append(blocks, ports.Block{
 			ID: b.ID, Position: b.Position, Title: b.Title, Body: b.Body,
 		})
+		if !hasSpoilers {
+			hasSpoilers = bodyHasSpoilers(b.Body)
+		}
 	}
 	return ports.Review{
 		ID:            item.ID,
@@ -64,5 +69,14 @@ func toPortReview(item domain.Review) ports.Review {
 		Rating:        item.Rating,
 		Status:        item.Status,
 		Blocks:        blocks,
+		HasSpoilers:   hasSpoilers,
 	}
+}
+
+func bodyHasSpoilers(body string) bool {
+	i := strings.Index(body, "||")
+	if i < 0 {
+		return false
+	}
+	return strings.Contains(body[i+2:], "||")
 }

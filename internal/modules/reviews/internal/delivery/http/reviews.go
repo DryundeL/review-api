@@ -39,7 +39,8 @@ type reviewJSON struct {
 	Title         string      `json:"title"`
 	Rating        int16       `json:"rating"`
 	Status        string      `json:"status"`
-	Blocks        []blockJSON `json:"blocks"`
+	Blocks        []blockJSON `json:"blocks,omitempty"`
+	HasSpoilers   bool        `json:"hasSpoilers"`
 	LikesCount    int64       `json:"likesCount"`
 	DislikesCount int64       `json:"dislikesCount"`
 	ViewsCount    int64       `json:"viewsCount"`
@@ -256,9 +257,24 @@ func parseLimit(c echo.Context) int {
 func reviewsResponse(items []ports.Review) []reviewJSON {
 	out := make([]reviewJSON, 0, len(items))
 	for _, item := range items {
-		out = append(out, reviewResponse(item))
+		out = append(out, reviewListItem(item))
 	}
 	return out
+}
+
+func reviewListItem(item ports.Review) reviewJSON {
+	return reviewJSON{
+		ID:            item.ID.String(),
+		AuthorID:      item.AuthorID.String(),
+		MediaObjectID: item.MediaObjectID.String(),
+		Title:         item.Title,
+		Rating:        item.Rating,
+		Status:        item.Status,
+		HasSpoilers:   item.HasSpoilers,
+		LikesCount:    item.LikesCount,
+		DislikesCount: item.DislikesCount,
+		ViewsCount:    item.ViewsCount,
+	}
 }
 
 func reviewResponse(item ports.Review) reviewJSON {
@@ -276,6 +292,7 @@ func reviewResponse(item ports.Review) reviewJSON {
 		Rating:        item.Rating,
 		Status:        item.Status,
 		Blocks:        blocks,
+		HasSpoilers:   item.HasSpoilers,
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,6 +15,21 @@ import (
 )
 
 const maxListLimit = 50
+
+// spoilersExistSQL is true when any block body has a ||...|| pair.
+const spoilersExistSQL = `
+	(SELECT EXISTS (
+		SELECT 1 FROM review_blocks b
+		WHERE b.review_id = r.id AND b.body ~ '\|\|.*\|\|'
+	)) AS has_spoilers
+`
+
+const reviewSelectSQL = `
+	SELECT id, author_id, media_object_id, title, rating, status,
+		(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
+		(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
+		(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
+`
 
 // ReviewRepository reads reviews with counters (no aggregate hydration).
 type ReviewRepository struct {
@@ -28,11 +44,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (ports.Review,
 	if r == nil || r.pool == nil || id == uuid.Nil {
 		return ports.Review{}, contract.ErrNotFound
 	}
-	const query = `
-		SELECT id, author_id, media_object_id, title, rating, status,
-			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
-			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
-			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
+	query := reviewSelectSQL + `
 		FROM reviews r
 		WHERE id = $1
 	`
@@ -48,6 +60,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (ports.Review,
 		return ports.Review{}, err
 	}
 	item.Blocks = blocks
+	item.HasSpoilers = blocksHaveSpoilers(blocks)
 	return item, nil
 }
 
@@ -57,6 +70,7 @@ func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID uuid.U
 	}
 	return r.list(ctx, `
 		SELECT id, author_id, media_object_id, title, rating, status,
+			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
@@ -71,25 +85,18 @@ func (r *ReviewRepository) ListByAuthor(ctx context.Context, authorID uuid.UUID,
 	if authorID == uuid.Nil {
 		return nil, contract.FieldError{Field: "authorId"}
 	}
+	statusFilter := ""
 	if publishedOnly {
-		return r.list(ctx, `
-			SELECT id, author_id, media_object_id, title, rating, status,
-				(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
-				(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
-				(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
-			FROM reviews r
-			WHERE author_id = $1 AND status = 'published'
-			ORDER BY created_at DESC
-			LIMIT $2
-		`, authorID, limit)
+		statusFilter = " AND status = 'published'"
 	}
 	return r.list(ctx, `
 		SELECT id, author_id, media_object_id, title, rating, status,
+			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
 		FROM reviews r
-		WHERE author_id = $1
+		WHERE author_id = $1`+statusFilter+`
 		ORDER BY created_at DESC
 		LIMIT $2
 	`, authorID, limit)
@@ -108,66 +115,38 @@ func (r *ReviewRepository) list(ctx context.Context, query string, filterID uuid
 	}
 	defer rows.Close()
 	out := make([]ports.Review, 0)
-	ids := make([]uuid.UUID, 0)
 	for rows.Next() {
-		item, err := scanReview(rows)
+		item, err := scanListReview(rows)
 		if err != nil {
 			return nil, fmt.Errorf("scan review: %w", err)
 		}
 		out = append(out, item)
-		ids = append(ids, item.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("list reviews: %w", err)
-	}
-	if len(ids) == 0 {
-		return out, nil
-	}
-	blocksByReview, err := r.loadBlocksForReviews(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for i := range out {
-		out[i].Blocks = blocksByReview[out[i].ID]
-		if out[i].Blocks == nil {
-			out[i].Blocks = []ports.Block{}
-		}
 	}
 	return out, nil
 }
 
 func (r *ReviewRepository) loadBlocks(ctx context.Context, reviewID uuid.UUID) ([]ports.Block, error) {
-	m, err := r.loadBlocksForReviews(ctx, []uuid.UUID{reviewID})
-	if err != nil {
-		return nil, err
-	}
-	blocks := m[reviewID]
-	if blocks == nil {
-		return []ports.Block{}, nil
-	}
-	return blocks, nil
-}
-
-func (r *ReviewRepository) loadBlocksForReviews(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID][]ports.Block, error) {
 	const query = `
-		SELECT id, review_id, position, title, body
+		SELECT id, position, title, body
 		FROM review_blocks
-		WHERE review_id = ANY($1)
-		ORDER BY review_id, position
+		WHERE review_id = $1
+		ORDER BY position
 	`
-	rows, err := r.pool.Query(ctx, query, ids)
+	rows, err := r.pool.Query(ctx, query, reviewID)
 	if err != nil {
 		return nil, fmt.Errorf("list review blocks: %w", err)
 	}
 	defer rows.Close()
-	out := make(map[uuid.UUID][]ports.Block, len(ids))
+	out := make([]ports.Block, 0)
 	for rows.Next() {
 		var block ports.Block
-		var reviewID uuid.UUID
-		if err := rows.Scan(&block.ID, &reviewID, &block.Position, &block.Title, &block.Body); err != nil {
+		if err := rows.Scan(&block.ID, &block.Position, &block.Title, &block.Body); err != nil {
 			return nil, fmt.Errorf("scan review block: %w", err)
 		}
-		out[reviewID] = append(out[reviewID], block)
+		out = append(out, block)
 	}
 	return out, rows.Err()
 }
@@ -179,4 +158,32 @@ func scanReview(row pgx.Row) (ports.Review, error) {
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
 	)
 	return item, err
+}
+
+func scanListReview(row pgx.Row) (ports.Review, error) {
+	var item ports.Review
+	err := row.Scan(
+		&item.ID, &item.AuthorID, &item.MediaObjectID, &item.Title, &item.Rating, &item.Status,
+		&item.HasSpoilers,
+		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
+	)
+	return item, err
+}
+
+func blocksHaveSpoilers(blocks []ports.Block) bool {
+	for _, b := range blocks {
+		if hasSpoilerMarkup(b.Body) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSpoilerMarkup is true when body contains at least one ||...|| pair.
+func hasSpoilerMarkup(body string) bool {
+	i := strings.Index(body, "||")
+	if i < 0 {
+		return false
+	}
+	return strings.Contains(body[i+2:], "||")
 }

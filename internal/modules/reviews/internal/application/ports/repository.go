@@ -35,6 +35,7 @@ type Block struct {
 }
 
 // Review is a read DTO for one review with counters.
+// Lists omit Blocks and set HasSpoilers; Get fills Blocks.
 type Review struct {
 	ID            uuid.UUID
 	AuthorID      uuid.UUID
@@ -43,6 +44,7 @@ type Review struct {
 	Rating        int16
 	Status        string
 	Blocks        []Block
+	HasSpoilers   bool
 	LikesCount    int64
 	DislikesCount int64
 	ViewsCount    int64

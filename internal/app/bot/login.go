@@ -48,6 +48,9 @@ func (a *App) handleLoginStart(ctx context.Context, update Update, id string) er
 	}
 	from := update.Message.From
 	chatID := update.Message.Chat.ID
+	if err := a.openPrivateChat(ctx, telegramProfile(from), chatID); err != nil {
+		return err
+	}
 	login, err := a.logins.GetLogin(ctx, id)
 	if errors.Is(err, authcontract.ErrLoginNotFound) {
 		return a.send(ctx, chatID, loginNotice(from.LanguageCode, "expired"), nil)

@@ -134,6 +134,12 @@ func (a *App) handle(ctx context.Context, update Update) error {
 	if !ok {
 		return nil
 	}
+	return a.openPrivateChat(ctx, profile, chatID)
+}
+
+// openPrivateChat creates the profile and attaches Mini App menu + reply keyboard.
+// Login deep-links skip plain /start, so they must call this themselves.
+func (a *App) openPrivateChat(ctx context.Context, profile contract.TelegramProfile, chatID int64) error {
 	if err := a.users.EnsureUser(ctx, profile); err != nil {
 		if errors.Is(err, contract.ErrInvalidProfile) {
 			a.log.Warn("skip invalid start profile", "telegram_id", profile.TelegramID)
@@ -142,7 +148,7 @@ func (a *App) handle(ctx context.Context, update Update) error {
 		return err
 	}
 	a.log.Info("user ensured from start", "telegram_id", profile.TelegramID)
-	if chatID == 0 {
+	if chatID == 0 || a.miniAppURL == "" {
 		return nil
 	}
 	view := startMessage(profile, a.miniAppURL)
@@ -154,15 +160,7 @@ func (a *App) handle(ctx context.Context, update Update) error {
 			return err
 		}
 	}
-	if err := a.client.SendMessage(ctx, chatID, view.Text, view.Markup); err != nil {
-		var api *APIError
-		if errors.As(err, &api) && !api.Temporary() {
-			a.log.Warn("start reply not delivered", "telegram_id", profile.TelegramID, "error", err)
-			return nil
-		}
-		return err
-	}
-	return nil
+	return a.send(ctx, chatID, view.Text, view.Markup)
 }
 
 func retryDelay(err error) time.Duration {

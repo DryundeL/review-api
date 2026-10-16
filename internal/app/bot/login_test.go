@@ -49,11 +49,15 @@ func TestLoginPromptNamesBrowser(t *testing.T) {
 func TestHandleLoginConfirm(t *testing.T) {
 	t.Parallel()
 	const id = "0123456789abcdef0123456789abcdef"
+	var messages []map[string]any
 	bodies := map[string]map[string]any{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		bodies[r.URL.Path] = body
+		if strings.HasSuffix(r.URL.Path, "/sendMessage") {
+			messages = append(messages, body)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"ok":true,"result":true}`)
 	}))
@@ -64,10 +68,11 @@ func TestHandleLoginConfirm(t *testing.T) {
 	client := NewClient("123456:abcDEF_token-1")
 	client.base = srv.URL
 	app := &App{
-		users:  users,
-		logins: logins,
-		client: client,
-		log:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		users:      users,
+		logins:     logins,
+		client:     client,
+		log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		miniAppURL: "https://app.example.com",
 	}
 	err := app.handle(context.Background(), Update{
 		Message: &Message{
@@ -79,10 +84,24 @@ func TestHandleLoginConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sent := bodies["/bot123456:abcDEF_token-1/sendMessage"]
-	text, _ := sent["text"].(string)
-	if !strings.Contains(text, "Браузер: Chrome") || !strings.Contains(text, "Устройство: macOS") {
-		t.Fatalf("prompt = %q", text)
+	if users.calls != 1 || users.profile.TelegramID != 42 {
+		t.Fatalf("ensured %+v calls=%d", users.profile, users.calls)
+	}
+	menu := bodies["/bot123456:abcDEF_token-1/setChatMenuButton"]
+	menuButton, _ := menu["menu_button"].(map[string]any)
+	if menuButton["type"] != "web_app" || menuButton["text"] != "Открыть" {
+		t.Fatalf("menu button = %#v", menu["menu_button"])
+	}
+	if len(messages) != 2 {
+		t.Fatalf("messages = %d", len(messages))
+	}
+	welcomeMarkup, _ := messages[0]["reply_markup"].(map[string]any)
+	if welcomeMarkup["keyboard"] == nil || welcomeMarkup["is_persistent"] != true {
+		t.Fatalf("welcome markup = %#v", messages[0]["reply_markup"])
+	}
+	prompt, _ := messages[1]["text"].(string)
+	if !strings.Contains(prompt, "Браузер: Chrome") || !strings.Contains(prompt, "Устройство: macOS") {
+		t.Fatalf("prompt = %q", prompt)
 	}
 
 	err = app.handle(context.Background(), Update{
@@ -99,8 +118,8 @@ func TestHandleLoginConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if users.calls != 1 || users.profile.TelegramID != 42 || logins.confirmed != 42 {
-		t.Fatalf("users=%+v confirmed=%d", users.profile, logins.confirmed)
+	if users.calls != 2 || logins.confirmed != 42 {
+		t.Fatalf("users calls=%d confirmed=%d", users.calls, logins.confirmed)
 	}
 	edited := bodies["/bot123456:abcDEF_token-1/editMessageText"]
 	editedText, _ := edited["text"].(string)

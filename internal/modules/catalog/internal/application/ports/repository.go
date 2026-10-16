@@ -11,7 +11,9 @@ import (
 type MediaObject struct {
 	ID             uuid.UUID
 	Title          string
+	OriginalTitle  string
 	Type           string
+	Genre          string
 	ReleaseYear    *int
 	PosterURL      string
 	ReleaseStatus  string

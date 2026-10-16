@@ -116,7 +116,7 @@ func parseCSV(r io.Reader) ([]domain.Draft, error) {
 }
 
 type csvCol struct {
-	title, typ, year, poster, status, source, externalID int
+	title, original, typ, genre, year, poster, status, source, externalID int
 }
 
 func csvColumns(header []string) (csvCol, error) {
@@ -132,7 +132,13 @@ func csvColumns(header []string) (csvCol, error) {
 	}
 	col := csvCol{
 		title: idx["title"], typ: idx["type"], status: idx["release_status"],
-		year: -1, poster: -1, source: -1, externalID: -1,
+		original: -1, genre: -1, year: -1, poster: -1, source: -1, externalID: -1,
+	}
+	if i, ok := idx["original_title"]; ok {
+		col.original = i
+	}
+	if i, ok := idx["genre"]; ok {
+		col.genre = i
 	}
 	if i, ok := idx["release_year"]; ok {
 		col.year = i
@@ -158,7 +164,9 @@ func draftFromCSV(rec []string, col csvCol) (domain.Draft, error) {
 	}
 	draft := domain.Draft{
 		Title:          get(col.title),
+		OriginalTitle:  get(col.original),
 		Type:           get(col.typ),
+		Genre:          get(col.genre),
 		PosterURL:      get(col.poster),
 		ReleaseStatus:  get(col.status),
 		ExternalSource: get(col.source),
@@ -181,7 +189,9 @@ type importJSONBody struct {
 type itemJSON struct {
 	ID             string  `json:"id"`
 	Title          string  `json:"title"`
+	OriginalTitle  string  `json:"originalTitle,omitempty"`
 	Type           string  `json:"type"`
+	Genre          string  `json:"genre,omitempty"`
 	ReleaseYear    *int    `json:"releaseYear,omitempty"`
 	PosterURL      string  `json:"posterUrl,omitempty"`
 	ReleaseStatus  string  `json:"releaseStatus"`
@@ -211,7 +221,9 @@ func itemResponse(item ports.MediaObject) itemJSON {
 	out := itemJSON{
 		ID:             item.ID.String(),
 		Title:          item.Title,
+		OriginalTitle:  item.OriginalTitle,
 		Type:           item.Type,
+		Genre:          item.Genre,
 		ReleaseYear:    item.ReleaseYear,
 		PosterURL:      item.PosterURL,
 		ReleaseStatus:  item.ReleaseStatus,

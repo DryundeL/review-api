@@ -66,7 +66,7 @@ func TestImportRequiresAdminAndRejectsBadPoster(t *testing.T) {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/admin/media-objects/import", strings.NewReader(`{"items":[{"title":"Фильм","type":"movie","releaseStatus":"completed"}]}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/admin/media-objects/import", strings.NewReader(`{"items":[{"title":"Фильм","originalTitle":"Movie","type":"movie","genre":"drama","releaseStatus":"completed"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(httpserver.AdminTokenHeader, token)
 	rec = httptest.NewRecorder()
@@ -78,7 +78,7 @@ func TestImportRequiresAdminAndRejectsBadPoster(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Count != 1 || len(body.Items) != 1 || body.Items[0].Type != "movie" {
+	if body.Count != 1 || len(body.Items) != 1 || body.Items[0].Type != "movie" || body.Items[0].OriginalTitle != "Movie" || body.Items[0].Genre != "drama" {
 		t.Fatalf("body = %+v", body)
 	}
 }
@@ -95,7 +95,7 @@ func TestImportCSV(t *testing.T) {
 	token := strings.Repeat("b", 32)
 	Register(e.Group("/v1"), h, httpserver.AdminToken(token))
 
-	csvBody := "title,type,release_status,release_year,poster_url\nМатрица,movie,completed,1999,https://cdn.example/p.jpg\n"
+	csvBody := "title,original_title,type,genre,release_status,release_year,poster_url\nМатрица,The Matrix,movie,sci-fi,completed,1999,https://cdn.example/p.jpg\n"
 	req := httptest.NewRequest(http.MethodPost, "/v1/admin/media-objects/import", strings.NewReader(csvBody))
 	req.Header.Set("Content-Type", "text/csv")
 	req.Header.Set(httpserver.AdminTokenHeader, token)
@@ -103,6 +103,13 @@ func TestImportCSV(t *testing.T) {
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	var body importResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Count != 1 || body.Items[0].OriginalTitle != "The Matrix" || body.Items[0].Genre != "sci-fi" {
+		t.Fatalf("body = %+v", body)
 	}
 }
 

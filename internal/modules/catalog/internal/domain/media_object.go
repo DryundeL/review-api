@@ -16,6 +16,7 @@ import (
 
 const (
 	maxTitleLen    = 200
+	maxGenreLen    = 100
 	maxPosterLen   = 2048
 	maxExternalLen = 128
 	minYear        = 1800
@@ -30,7 +31,9 @@ var externalToken = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 type MediaObject struct {
 	ID             uuid.UUID
 	Title          string
+	OriginalTitle  string
 	Type           string
+	Genre          string
 	ReleaseYear    *int
 	PosterURL      string
 	ReleaseStatus  string
@@ -41,7 +44,9 @@ type MediaObject struct {
 
 type Draft struct {
 	Title          string `json:"title"`
+	OriginalTitle  string `json:"originalTitle"`
 	Type           string `json:"type"`
+	Genre          string `json:"genre"`
 	ReleaseYear    *int   `json:"releaseYear"`
 	PosterURL      string `json:"posterUrl"`
 	ReleaseStatus  string `json:"releaseStatus"`
@@ -56,7 +61,15 @@ func NewImported(draft Draft) (MediaObject, error) {
 	if err != nil {
 		return MediaObject{}, err
 	}
+	original, err := parseOptionalTitle(draft.OriginalTitle, "originalTitle")
+	if err != nil {
+		return MediaObject{}, err
+	}
 	typ, err := parseType(draft.Type)
+	if err != nil {
+		return MediaObject{}, err
+	}
+	genre, err := parseGenre(draft.Genre)
 	if err != nil {
 		return MediaObject{}, err
 	}
@@ -82,7 +95,9 @@ func NewImported(draft Draft) (MediaObject, error) {
 	return MediaObject{
 		ID:             uuid.New(),
 		Title:          title,
+		OriginalTitle:  original,
 		Type:           typ,
+		Genre:          genre,
 		ReleaseYear:    year,
 		PosterURL:      poster,
 		ReleaseStatus:  draft.ReleaseStatus,
@@ -95,6 +110,28 @@ func parseTitle(value string) (string, error) {
 	value = strings.TrimSpace(strings.Map(dropControl, value))
 	if value == "" || utf8.RuneCountInString(value) > maxTitleLen {
 		return "", contract.FieldError{Field: "title"}
+	}
+	return value, nil
+}
+
+func parseOptionalTitle(value, field string) (string, error) {
+	value = strings.TrimSpace(strings.Map(dropControl, value))
+	if value == "" {
+		return "", nil
+	}
+	if utf8.RuneCountInString(value) > maxTitleLen {
+		return "", contract.FieldError{Field: field}
+	}
+	return value, nil
+}
+
+func parseGenre(value string) (string, error) {
+	value = strings.TrimSpace(strings.Map(dropControl, value))
+	if value == "" {
+		return "", nil
+	}
+	if utf8.RuneCountInString(value) > maxGenreLen {
+		return "", contract.FieldError{Field: "genre"}
 	}
 	return value, nil
 }

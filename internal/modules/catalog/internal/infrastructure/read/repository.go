@@ -27,7 +27,7 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (ports.MediaObject, 
 		return ports.MediaObject{}, contract.ErrNotFound
 	}
 	const query = `
-		SELECT id, title, type, release_year, poster_url, release_status,
+		SELECT id, title, original_title, type, genre, release_year, poster_url, release_status,
 			external_source, external_id, created_by
 		FROM media_objects
 		WHERE id = $1
@@ -47,11 +47,12 @@ func (r *Repository) Search(ctx context.Context, text, typeCode string, limit in
 		return nil, contract.ErrInvalid
 	}
 	const query = `
-		SELECT id, title, type, release_year, poster_url, release_status,
+		SELECT id, title, original_title, type, genre, release_year, poster_url, release_status,
 			external_source, external_id, created_by
 		FROM media_objects
 		WHERE ($1::text = '' OR type = $1)
-		AND ($2::text = '' OR title ILIKE '%' || $2 || '%' ESCAPE '\')
+		AND ($2::text = '' OR title ILIKE '%' || $2 || '%' ESCAPE '\'
+			OR original_title ILIKE '%' || $2 || '%' ESCAPE '\')
 		ORDER BY created_at DESC
 		LIMIT $3
 	`
@@ -77,16 +78,22 @@ func (r *Repository) Search(ctx context.Context, text, typeCode string, limit in
 func scanItem(row pgx.Row) (ports.MediaObject, error) {
 	var item ports.MediaObject
 	var year *int
-	var poster, source, externalID *string
+	var original, genre, poster, source, externalID *string
 	var createdBy *uuid.UUID
 	err := row.Scan(
-		&item.ID, &item.Title, &item.Type, &year, &poster, &item.ReleaseStatus,
+		&item.ID, &item.Title, &original, &item.Type, &genre, &year, &poster, &item.ReleaseStatus,
 		&source, &externalID, &createdBy,
 	)
 	if err != nil {
 		return ports.MediaObject{}, err
 	}
 	item.ReleaseYear = year
+	if original != nil {
+		item.OriginalTitle = *original
+	}
+	if genre != nil {
+		item.Genre = *genre
+	}
 	if poster != nil {
 		item.PosterURL = *poster
 	}

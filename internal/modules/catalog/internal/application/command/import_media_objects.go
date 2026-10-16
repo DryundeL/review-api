@@ -86,7 +86,9 @@ func toPort(item domain.MediaObject) ports.MediaObject {
 	return ports.MediaObject{
 		ID:             item.ID,
 		Title:          item.Title,
+		OriginalTitle:  item.OriginalTitle,
 		Type:           item.Type,
+		Genre:          item.Genre,
 		ReleaseYear:    item.ReleaseYear,
 		PosterURL:      item.PosterURL,
 		ReleaseStatus:  item.ReleaseStatus,

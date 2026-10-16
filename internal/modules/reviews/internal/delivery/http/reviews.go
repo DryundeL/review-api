@@ -33,16 +33,16 @@ type voteBody struct {
 }
 
 type reviewJSON struct {
-	ID            string           `json:"id"`
-	AuthorID      string           `json:"authorId"`
-	MediaObjectID string           `json:"mediaObjectId"`
-	Title         string           `json:"title"`
-	Rating        int16            `json:"rating"`
-	Status        string           `json:"status"`
-	Blocks        []blockJSON      `json:"blocks"`
-	LikesCount    int64            `json:"likesCount"`
-	DislikesCount int64            `json:"dislikesCount"`
-	ViewsCount    int64            `json:"viewsCount"`
+	ID            string      `json:"id"`
+	AuthorID      string      `json:"authorId"`
+	MediaObjectID string      `json:"mediaObjectId"`
+	Title         string      `json:"title"`
+	Rating        int16       `json:"rating"`
+	Status        string      `json:"status"`
+	Blocks        []blockJSON `json:"blocks"`
+	LikesCount    int64       `json:"likesCount"`
+	DislikesCount int64       `json:"dislikesCount"`
+	ViewsCount    int64       `json:"viewsCount"`
 }
 
 type blockJSON struct {

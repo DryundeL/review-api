@@ -13,6 +13,7 @@ import (
 	catalogcontract "review-api/internal/modules/catalog/contract"
 	"review-api/internal/modules/reviews"
 	reviewscontract "review-api/internal/modules/reviews/contract"
+	"review-api/internal/modules/social"
 	"review-api/internal/modules/users"
 	userscontract "review-api/internal/modules/users/contract"
 	"review-api/internal/platform/config"
@@ -24,6 +25,7 @@ type Modules struct {
 	Users   *users.Module
 	Reviews *reviews.Module
 	Catalog *catalog.Module
+	Social  *social.Module
 }
 
 func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modules {
@@ -47,13 +49,23 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 	reviewsMod := reviews.New(reviews.Dependencies{
 		Pool:  pool,
 		Admin: admin,
+		Auth:  authMod.Middlewares.Bearer,
+		Users: usersMod,
 	})
 	catalogMod := catalog.New(catalog.Dependencies{
 		Pool:  pool,
 		Admin: admin,
 		Types: reviewTypes{reviews: reviewsMod},
 	})
-	return Modules{Auth: authMod, Users: usersMod, Reviews: reviewsMod, Catalog: catalogMod}
+	socialMod := social.New(social.Dependencies{
+		Pool:  pool,
+		Auth:  authMod.Middlewares.Bearer,
+		Users: usersMod,
+	})
+	return Modules{
+		Auth: authMod, Users: usersMod, Reviews: reviewsMod,
+		Catalog: catalogMod, Social: socialMod,
+	}
 }
 
 type reviewTypes struct {

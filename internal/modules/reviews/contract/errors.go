@@ -3,9 +3,10 @@ package contract
 import "errors"
 
 var (
-	ErrNotFound = errors.New("not found")
-	ErrConflict = errors.New("review type already exists")
-	ErrInvalid  = errors.New("invalid review type")
+	ErrNotFound  = errors.New("not found")
+	ErrConflict  = errors.New("conflict")
+	ErrInvalid   = errors.New("invalid")
+	ErrForbidden = errors.New("forbidden")
 )
 
 // FieldError names the rejected field. The field is a fixed token, never raw input.

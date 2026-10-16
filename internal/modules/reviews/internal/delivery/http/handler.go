@@ -1,9 +1,11 @@
 package reviewshttp
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"review-api/internal/http/httperr"
@@ -25,15 +27,53 @@ type StatusCatalog struct {
 	Release     []StatusItem
 }
 
-type Handler struct {
-	list     *query.ListTypesHandler
-	create   *command.CreateTypeHandler
-	update   *command.UpdateTypeHandler
-	statuses StatusCatalog
+// UserResolver maps Telegram identity to internal user id.
+type UserResolver interface {
+	UserID(ctx context.Context, telegramID int64) (uuid.UUID, error)
 }
 
-func NewHandler(list *query.ListTypesHandler, create *command.CreateTypeHandler, update *command.UpdateTypeHandler, statuses StatusCatalog) *Handler {
-	return &Handler{list: list, create: create, update: update, statuses: statuses}
+type Handler struct {
+	list         *query.ListTypesHandler
+	create       *command.CreateTypeHandler
+	update       *command.UpdateTypeHandler
+	statuses     StatusCatalog
+	createReview *command.CreateReviewHandler
+	updateReview *command.UpdateReviewHandler
+	getReview    *query.GetReviewHandler
+	listReviews  *query.ListReviewsHandler
+	voteReview   *command.VoteReviewHandler
+	viewReview   *command.ViewReviewHandler
+	users        UserResolver
+}
+
+type HandlerDeps struct {
+	ListTypes    *query.ListTypesHandler
+	CreateType   *command.CreateTypeHandler
+	UpdateType   *command.UpdateTypeHandler
+	Statuses     StatusCatalog
+	CreateReview *command.CreateReviewHandler
+	UpdateReview *command.UpdateReviewHandler
+	GetReview    *query.GetReviewHandler
+	ListReviews  *query.ListReviewsHandler
+	VoteReview   *command.VoteReviewHandler
+	ViewReview   *command.ViewReviewHandler
+	Users        UserResolver
+}
+
+func NewHandler(deps HandlerDeps) *Handler {
+	return &Handler{
+		list:         deps.ListTypes,
+		create:       deps.CreateType,
+		update:       deps.UpdateType,
+		statuses:     deps.Statuses,
+		createReview: deps.CreateReview,
+		updateReview: deps.UpdateReview,
+		getReview:    deps.GetReview,
+		listReviews:  deps.ListReviews,
+		voteReview:   deps.VoteReview,
+		viewReview:   deps.ViewReview,
+		users:        deps.Users,
+	}
 }
 
 func (h *Handler) List(c echo.Context) error {

@@ -1,3 +1,9 @@
 package reviews
 
-// No integration events. Review type changes have no consumers yet.
+import "review-api/internal/modules/reviews/contract"
+
+const (
+	EventPublished = contract.EventPublished
+	EventVoted     = contract.EventVoted
+	EventViewed    = contract.EventViewed
+)

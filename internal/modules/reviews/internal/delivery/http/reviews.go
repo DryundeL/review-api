@@ -155,6 +155,22 @@ func (h *Handler) ListUserReviews(c echo.Context) error {
 	return c.JSON(http.StatusOK, reviewsListResponse{Items: reviewsResponse(items)})
 }
 
+func (h *Handler) DeleteReview(c echo.Context) error {
+	userID, err := h.resolveUser(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "review not found")
+	}
+	if err := h.deleteReview.Handle(c.Request().Context(), id, userID); err != nil {
+		return mapReviewError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *Handler) VoteReview(c echo.Context) error {
 	userID, err := h.resolveUser(c)
 	if err != nil {

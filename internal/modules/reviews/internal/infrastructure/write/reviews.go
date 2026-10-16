@@ -83,6 +83,17 @@ func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (domain.Review
 	return item, nil
 }
 
+func (r *ReviewRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.execTag(ctx, `DELETE FROM reviews WHERE id = $1`, id)
+	if err != nil {
+		return mapReviewWriteError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return contract.ErrNotFound
+	}
+	return nil
+}
+
 func (r *ReviewRepository) UpsertVote(ctx context.Context, reviewID, userID uuid.UUID, isLike bool) error {
 	const query = `
 		INSERT INTO review_votes (review_id, user_id, is_like)

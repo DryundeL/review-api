@@ -51,6 +51,7 @@ type Review struct {
 type ReviewWriter interface {
 	Create(ctx context.Context, item domain.Review) error
 	Replace(ctx context.Context, item domain.Review) error
+	Delete(ctx context.Context, id uuid.UUID) error
 	Get(ctx context.Context, id uuid.UUID) (domain.Review, error)
 	UpsertVote(ctx context.Context, reviewID, userID uuid.UUID, isLike bool) error
 	InsertView(ctx context.Context, reviewID, userID uuid.UUID) (inserted bool, err error)

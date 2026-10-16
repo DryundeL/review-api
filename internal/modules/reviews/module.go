@@ -35,6 +35,7 @@ type Module struct {
 	update       *command.UpdateTypeHandler
 	createReview *command.CreateReviewHandler
 	updateReview *command.UpdateReviewHandler
+	deleteReview *command.DeleteReviewHandler
 	getReview    *query.GetReviewHandler
 	listReviews  *query.ListReviewsHandler
 	voteReview   *command.VoteReviewHandler
@@ -58,6 +59,7 @@ func New(deps Dependencies) *Module {
 		update:       command.NewUpdateTypeHandler(typeWriter),
 		createReview: command.NewCreateReviewHandler(reviewWriter, tx, pub),
 		updateReview: command.NewUpdateReviewHandler(reviewWriter, tx, pub),
+		deleteReview: command.NewDeleteReviewHandler(reviewWriter),
 		getReview:    query.NewGetReviewHandler(reviewReader),
 		listReviews:  query.NewListReviewsHandler(reviewReader),
 		voteReview:   command.NewVoteReviewHandler(reviewWriter, tx, pub),
@@ -101,6 +103,7 @@ func (m *Module) RegisterHTTP(g *echo.Group) {
 		Statuses:     m.statusCatalog(),
 		CreateReview: m.createReview,
 		UpdateReview: m.updateReview,
+		DeleteReview: m.deleteReview,
 		GetReview:    m.getReview,
 		ListReviews:  m.listReviews,
 		VoteReview:   m.voteReview,

@@ -37,6 +37,9 @@ func (h *ViewReviewHandler) Handle(ctx context.Context, reviewID, userID uuid.UU
 		if item.Status != domain.StatusPublished {
 			return contract.ErrNotFound
 		}
+		if item.AuthorID == userID {
+			return nil
+		}
 		inserted, err := h.repo.InsertView(txCtx, reviewID, userID)
 		if err != nil {
 			return err

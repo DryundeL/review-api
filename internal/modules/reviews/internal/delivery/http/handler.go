@@ -39,6 +39,7 @@ type Handler struct {
 	statuses     StatusCatalog
 	createReview *command.CreateReviewHandler
 	updateReview *command.UpdateReviewHandler
+	deleteReview *command.DeleteReviewHandler
 	getReview    *query.GetReviewHandler
 	listReviews  *query.ListReviewsHandler
 	voteReview   *command.VoteReviewHandler
@@ -53,6 +54,7 @@ type HandlerDeps struct {
 	Statuses     StatusCatalog
 	CreateReview *command.CreateReviewHandler
 	UpdateReview *command.UpdateReviewHandler
+	DeleteReview *command.DeleteReviewHandler
 	GetReview    *query.GetReviewHandler
 	ListReviews  *query.ListReviewsHandler
 	VoteReview   *command.VoteReviewHandler
@@ -68,6 +70,7 @@ func NewHandler(deps HandlerDeps) *Handler {
 		statuses:     deps.Statuses,
 		createReview: deps.CreateReview,
 		updateReview: deps.UpdateReview,
+		deleteReview: deps.DeleteReview,
 		getReview:    deps.GetReview,
 		listReviews:  deps.ListReviews,
 		voteReview:   deps.VoteReview,

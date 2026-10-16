@@ -24,12 +24,7 @@ const spoilersExistSQL = `
 	)) AS has_spoilers
 `
 
-const reviewSelectSQL = `
-	SELECT id, author_id, media_object_id, title, rating, status,
-		(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
-		(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
-		(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
-`
+const mediaObjectSelectSQL = `mo.id, mo.title, mo.type, mo.poster_url`
 
 // ReviewRepository reads reviews with counters (no aggregate hydration).
 type ReviewRepository struct {
@@ -44,9 +39,14 @@ func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (ports.Review,
 	if r == nil || r.pool == nil || id == uuid.Nil {
 		return ports.Review{}, contract.ErrNotFound
 	}
-	query := reviewSelectSQL + `
+	const query = `
+		SELECT r.id, r.author_id, ` + mediaObjectSelectSQL + `, r.title, r.rating, r.status,
+			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
+			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
+			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
 		FROM reviews r
-		WHERE id = $1
+		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		WHERE r.id = $1
 	`
 	item, err := scanReview(r.pool.QueryRow(ctx, query, id))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -69,14 +69,15 @@ func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID uuid.U
 		return nil, contract.FieldError{Field: "mediaObjectId"}
 	}
 	return r.list(ctx, `
-		SELECT id, author_id, media_object_id, title, rating, status,
+		SELECT r.id, r.author_id, `+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
 			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
 		FROM reviews r
-		WHERE media_object_id = $1 AND status = 'published'
-		ORDER BY created_at DESC
+		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		WHERE r.media_object_id = $1 AND r.status = 'published'
+		ORDER BY r.created_at DESC
 		LIMIT $2
 	`, mediaObjectID, limit)
 }
@@ -87,17 +88,18 @@ func (r *ReviewRepository) ListByAuthor(ctx context.Context, authorID uuid.UUID,
 	}
 	statusFilter := ""
 	if publishedOnly {
-		statusFilter = " AND status = 'published'"
+		statusFilter = " AND r.status = 'published'"
 	}
 	return r.list(ctx, `
-		SELECT id, author_id, media_object_id, title, rating, status,
+		SELECT r.id, r.author_id, `+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
 			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
 		FROM reviews r
-		WHERE author_id = $1`+statusFilter+`
-		ORDER BY created_at DESC
+		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		WHERE r.author_id = $1`+statusFilter+`
+		ORDER BY r.created_at DESC
 		LIMIT $2
 	`, authorID, limit)
 }
@@ -153,21 +155,39 @@ func (r *ReviewRepository) loadBlocks(ctx context.Context, reviewID uuid.UUID) (
 
 func scanReview(row pgx.Row) (ports.Review, error) {
 	var item ports.Review
+	var poster *string
 	err := row.Scan(
-		&item.ID, &item.AuthorID, &item.MediaObjectID, &item.Title, &item.Rating, &item.Status,
+		&item.ID, &item.AuthorID,
+		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
+		&item.Title, &item.Rating, &item.Status,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
 	)
-	return item, err
+	if err != nil {
+		return ports.Review{}, err
+	}
+	if poster != nil {
+		item.MediaObject.PosterURL = *poster
+	}
+	return item, nil
 }
 
 func scanListReview(row pgx.Row) (ports.Review, error) {
 	var item ports.Review
+	var poster *string
 	err := row.Scan(
-		&item.ID, &item.AuthorID, &item.MediaObjectID, &item.Title, &item.Rating, &item.Status,
+		&item.ID, &item.AuthorID,
+		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
+		&item.Title, &item.Rating, &item.Status,
 		&item.HasSpoilers,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
 	)
-	return item, err
+	if err != nil {
+		return ports.Review{}, err
+	}
+	if poster != nil {
+		item.MediaObject.PosterURL = *poster
+	}
+	return item, nil
 }
 
 func blocksHaveSpoilers(blocks []ports.Block) bool {

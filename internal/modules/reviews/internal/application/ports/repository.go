@@ -34,12 +34,20 @@ type Block struct {
 	Body     string
 }
 
+// MediaObjectRef is a compact catalog title embedded in review responses.
+type MediaObjectRef struct {
+	ID        uuid.UUID
+	Title     string
+	Type      string
+	PosterURL string
+}
+
 // Review is a read DTO for one review with counters.
 // Lists omit Blocks and set HasSpoilers; Get fills Blocks.
 type Review struct {
 	ID            uuid.UUID
 	AuthorID      uuid.UUID
-	MediaObjectID uuid.UUID
+	MediaObject   MediaObjectRef
 	Title         string
 	Rating        int16
 	Status        string

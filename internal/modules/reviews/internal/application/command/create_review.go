@@ -62,14 +62,16 @@ func toPortReview(item domain.Review) ports.Review {
 		}
 	}
 	return ports.Review{
-		ID:            item.ID,
-		AuthorID:      item.AuthorID,
-		MediaObjectID: item.MediaObjectID,
-		Title:         item.Title,
-		Rating:        item.Rating,
-		Status:        item.Status,
-		Blocks:        blocks,
-		HasSpoilers:   hasSpoilers,
+		ID:       item.ID,
+		AuthorID: item.AuthorID,
+		MediaObject: ports.MediaObjectRef{
+			ID: item.MediaObjectID,
+		},
+		Title:       item.Title,
+		Rating:      item.Rating,
+		Status:      item.Status,
+		Blocks:      blocks,
+		HasSpoilers: hasSpoilers,
 	}
 }
 

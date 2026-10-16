@@ -33,17 +33,24 @@ type voteBody struct {
 }
 
 type reviewJSON struct {
-	ID            string      `json:"id"`
-	AuthorID      string      `json:"authorId"`
-	MediaObjectID string      `json:"mediaObjectId"`
-	Title         string      `json:"title"`
-	Rating        int16       `json:"rating"`
-	Status        string      `json:"status"`
-	Blocks        []blockJSON `json:"blocks,omitempty"`
-	HasSpoilers   bool        `json:"hasSpoilers"`
-	LikesCount    int64       `json:"likesCount"`
-	DislikesCount int64       `json:"dislikesCount"`
-	ViewsCount    int64       `json:"viewsCount"`
+	ID            string           `json:"id"`
+	AuthorID      string           `json:"authorId"`
+	MediaObject   *mediaObjectJSON `json:"mediaObject,omitempty"`
+	Title         string           `json:"title"`
+	Rating        int16            `json:"rating"`
+	Status        string           `json:"status"`
+	Blocks        []blockJSON      `json:"blocks,omitempty"`
+	HasSpoilers   bool             `json:"hasSpoilers"`
+	LikesCount    int64            `json:"likesCount"`
+	DislikesCount int64            `json:"dislikesCount"`
+	ViewsCount    int64            `json:"viewsCount"`
+}
+
+type mediaObjectJSON struct {
+	ID        string `json:"id"`
+	Title     string `json:"title,omitempty"`
+	Type      string `json:"type,omitempty"`
+	PosterURL string `json:"posterUrl,omitempty"`
 }
 
 type blockJSON struct {
@@ -266,7 +273,7 @@ func reviewListItem(item ports.Review) reviewJSON {
 	return reviewJSON{
 		ID:            item.ID.String(),
 		AuthorID:      item.AuthorID.String(),
-		MediaObjectID: item.MediaObjectID.String(),
+		MediaObject:   mediaObjectResponse(item.MediaObject),
 		Title:         item.Title,
 		Rating:        item.Rating,
 		Status:        item.Status,
@@ -287,7 +294,7 @@ func reviewResponse(item ports.Review) reviewJSON {
 	return reviewJSON{
 		ID:            item.ID.String(),
 		AuthorID:      item.AuthorID.String(),
-		MediaObjectID: item.MediaObjectID.String(),
+		MediaObject:   mediaObjectResponse(item.MediaObject),
 		Title:         item.Title,
 		Rating:        item.Rating,
 		Status:        item.Status,
@@ -296,6 +303,18 @@ func reviewResponse(item ports.Review) reviewJSON {
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,
+	}
+}
+
+func mediaObjectResponse(mo ports.MediaObjectRef) *mediaObjectJSON {
+	if mo.ID == uuid.Nil {
+		return nil
+	}
+	return &mediaObjectJSON{
+		ID:        mo.ID.String(),
+		Title:     mo.Title,
+		Type:      mo.Type,
+		PosterURL: mo.PosterURL,
 	}
 }
 

@@ -20,6 +20,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | reviews | BC | Черновик/публикация, блоки (`review_blocks`, ≤10), голоса (`review_votes`), просмотры (`review_views`). Справочник `review_types`. Статусы — конфиг модуля | catalog, media, users |
 | social | BC | Подписки (`follows`) | users |
 | feed | BC | Read-side лента: курсор, фильтр типов, режимы `following` / `popular` | reviews, social, users |
+| search | BC | Read-side поиск: trends-табы (media / authors / types) + общий текстовый поиск (`@username`, название обзора, media object) | reviews, catalog, social, users |
 | gamification | BC | Unlock'и, подсказки в ЛК. Consumer `ReviewPublished` | reviews, users |
 | notifications | BC | Пуши в Telegram. Скелет сразу, хендлеры после ядра | users, social, reviews |
 
@@ -28,7 +29,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 ## Порядок сборки
 
 ```
-platform → auth → users, media → catalog → reviews → social → feed, gamification → notifications
+platform → auth → users, media → catalog → reviews → social → feed, search, gamification → notifications
 ```
 
 Циклов нет. `auth` не импортирует `users`: кладёт `TelegramIdentity` в context через `auth/contract`. `users` читает контракт и делает EnsureUser в своём middleware, который вешает composition root.

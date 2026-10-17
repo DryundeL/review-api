@@ -77,6 +77,7 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		Catalog: modules.Catalog,
 		Social:  modules.Social,
 		Feed:    modules.Feed,
+		Search:  modules.Search,
 	}, routes.APIOptions{
 		Redis:           rdb,
 		RateLimitPerMin: cfg.App.RateLimitPerMin,

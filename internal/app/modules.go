@@ -14,6 +14,7 @@ import (
 	"review-api/internal/modules/feed"
 	"review-api/internal/modules/reviews"
 	reviewscontract "review-api/internal/modules/reviews/contract"
+	"review-api/internal/modules/search"
 	"review-api/internal/modules/social"
 	"review-api/internal/modules/users"
 	userscontract "review-api/internal/modules/users/contract"
@@ -28,6 +29,7 @@ type Modules struct {
 	Catalog *catalog.Module
 	Social  *social.Module
 	Feed    *feed.Module
+	Search  *search.Module
 }
 
 func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modules {
@@ -69,9 +71,14 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		Auth:  authMod.Middlewares.Bearer,
 		Users: usersMod,
 	})
+	searchMod := search.New(search.Dependencies{
+		Pool:  pool,
+		Auth:  authMod.Middlewares.Bearer,
+		Users: usersMod,
+	})
 	return Modules{
 		Auth: authMod, Users: usersMod, Reviews: reviewsMod,
-		Catalog: catalogMod, Social: socialMod, Feed: feedMod,
+		Catalog: catalogMod, Social: socialMod, Feed: feedMod, Search: searchMod,
 	}
 }
 

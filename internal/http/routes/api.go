@@ -10,6 +10,7 @@ import (
 	catalogmodule "review-api/internal/modules/catalog"
 	feedmodule "review-api/internal/modules/feed"
 	reviewsmodule "review-api/internal/modules/reviews"
+	searchmodule "review-api/internal/modules/search"
 	socialmodule "review-api/internal/modules/social"
 	usersmodule "review-api/internal/modules/users"
 	"review-api/internal/platform/ratelimit"
@@ -22,6 +23,7 @@ type APIModules struct {
 	Catalog *catalogmodule.Module
 	Social  *socialmodule.Module
 	Feed    *feedmodule.Module
+	Search  *searchmodule.Module
 }
 
 type APIOptions struct {
@@ -49,5 +51,8 @@ func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 	}
 	if modules.Feed != nil {
 		modules.Feed.RegisterHTTP(v1)
+	}
+	if modules.Search != nil {
+		modules.Search.RegisterHTTP(v1)
 	}
 }

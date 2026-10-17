@@ -56,12 +56,12 @@ type Cursor struct {
 
 // ListParams drives a single feed page.
 type ListParams struct {
-	Sort       string
-	Mode       string
-	Type       string
-	ViewerID   uuid.UUID // required when ModeFollowing
-	Cursor     *Cursor
-	Limit      int
+	Sort     string
+	Mode     string
+	Type     string
+	ViewerID uuid.UUID // required when ModeFollowing
+	Cursor   *Cursor
+	Limit    int
 }
 
 type Reader interface {

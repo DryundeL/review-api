@@ -58,7 +58,7 @@ func TestProfile(t *testing.T) {
 	t.Parallel()
 	uid := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	h := NewHandler(query.NewGetProfileHandler(stubProfiles{
-		user: domain.User{ID: uid, TelegramID: 42, Username: "ann", FirstName: "Ann"},
+		user:      domain.User{ID: uid, TelegramID: 42, Username: "ann", FirstName: "Ann"},
 		followers: 3, following: 1,
 	}), stubUsers{id: uid})
 	e := echo.New()
@@ -91,7 +91,7 @@ func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
 	target := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	viewer := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	h := NewHandler(query.NewGetProfileHandler(stubProfiles{
-		user: domain.User{ID: target, TelegramID: 42, Username: "ann", FirstName: "Ann"},
+		user:      domain.User{ID: target, TelegramID: 42, Username: "ann", FirstName: "Ann"},
 		followers: 2, isFollowing: true,
 	}), stubUsers{id: viewer})
 	e := echo.New()
@@ -120,7 +120,7 @@ func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
 
 	// own id via /profiles/{id}
 	h = NewHandler(query.NewGetProfileHandler(stubProfiles{
-		user: domain.User{ID: viewer, TelegramID: 99, Username: "bob", FirstName: "Bob"},
+		user:      domain.User{ID: viewer, TelegramID: 99, Username: "bob", FirstName: "Bob"},
 		followers: 0,
 	}), stubUsers{id: viewer})
 	e = echo.New()

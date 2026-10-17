@@ -14,19 +14,24 @@ import (
 
 type UpdateReviewHandler struct {
 	repo      ports.ReviewWriter
+	reader    ports.ReviewReader
 	tx        transaction.Manager
 	publisher ports.Publisher
 }
 
-func NewUpdateReviewHandler(repo ports.ReviewWriter, tx transaction.Manager, publisher ports.Publisher) *UpdateReviewHandler {
-	return &UpdateReviewHandler{repo: repo, tx: tx, publisher: publisher}
+func NewUpdateReviewHandler(
+	repo ports.ReviewWriter,
+	reader ports.ReviewReader,
+	tx transaction.Manager,
+	publisher ports.Publisher,
+) *UpdateReviewHandler {
+	return &UpdateReviewHandler{repo: repo, reader: reader, tx: tx, publisher: publisher}
 }
 
 func (h *UpdateReviewHandler) Handle(ctx context.Context, reviewID, authorID uuid.UUID, draft domain.Draft) (ports.Review, error) {
-	if h == nil || h.repo == nil || h.tx == nil || h.publisher == nil {
+	if h == nil || h.repo == nil || h.reader == nil || h.tx == nil || h.publisher == nil {
 		return ports.Review{}, contract.ErrInvalid
 	}
-	var out ports.Review
 	err := h.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		item, err := h.repo.Get(txCtx, reviewID)
 		if err != nil {
@@ -51,11 +56,14 @@ func (h *UpdateReviewHandler) Handle(ctx context.Context, reviewID, authorID uui
 				return err
 			}
 		}
-		out = toPortReview(item)
 		return nil
 	})
 	if err != nil {
 		return ports.Review{}, fmt.Errorf("update review: %w", err)
+	}
+	out, err := h.reader.Get(ctx, reviewID)
+	if err != nil {
+		return ports.Review{}, fmt.Errorf("update review read: %w", err)
 	}
 	return out, nil
 }

@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 
@@ -15,16 +14,22 @@ import (
 
 type CreateReviewHandler struct {
 	repo      ports.ReviewWriter
+	reader    ports.ReviewReader
 	tx        transaction.Manager
 	publisher ports.Publisher
 }
 
-func NewCreateReviewHandler(repo ports.ReviewWriter, tx transaction.Manager, publisher ports.Publisher) *CreateReviewHandler {
-	return &CreateReviewHandler{repo: repo, tx: tx, publisher: publisher}
+func NewCreateReviewHandler(
+	repo ports.ReviewWriter,
+	reader ports.ReviewReader,
+	tx transaction.Manager,
+	publisher ports.Publisher,
+) *CreateReviewHandler {
+	return &CreateReviewHandler{repo: repo, reader: reader, tx: tx, publisher: publisher}
 }
 
 func (h *CreateReviewHandler) Handle(ctx context.Context, authorID uuid.UUID, draft domain.Draft) (ports.Review, error) {
-	if h == nil || h.repo == nil || h.tx == nil || h.publisher == nil {
+	if h == nil || h.repo == nil || h.reader == nil || h.tx == nil || h.publisher == nil {
 		return ports.Review{}, contract.ErrInvalid
 	}
 	item, err := domain.NewReview(authorID, draft)
@@ -47,38 +52,9 @@ func (h *CreateReviewHandler) Handle(ctx context.Context, authorID uuid.UUID, dr
 	if err != nil {
 		return ports.Review{}, fmt.Errorf("create review: %w", err)
 	}
-	return toPortReview(item), nil
-}
-
-func toPortReview(item domain.Review) ports.Review {
-	blocks := make([]ports.Block, 0, len(item.Blocks))
-	hasSpoilers := false
-	for _, b := range item.Blocks {
-		blocks = append(blocks, ports.Block{
-			ID: b.ID, Position: b.Position, Title: b.Title, Body: b.Body,
-		})
-		if !hasSpoilers {
-			hasSpoilers = bodyHasSpoilers(b.Body)
-		}
+	out, err := h.reader.Get(ctx, item.ID)
+	if err != nil {
+		return ports.Review{}, fmt.Errorf("create review read: %w", err)
 	}
-	return ports.Review{
-		ID:       item.ID,
-		AuthorID: item.AuthorID,
-		MediaObject: ports.MediaObjectRef{
-			ID: item.MediaObjectID,
-		},
-		Title:       item.Title,
-		Rating:      item.Rating,
-		Status:      item.Status,
-		Blocks:      blocks,
-		HasSpoilers: hasSpoilers,
-	}
-}
-
-func bodyHasSpoilers(body string) bool {
-	i := strings.Index(body, "||")
-	if i < 0 {
-		return false
-	}
-	return strings.Contains(body[i+2:], "||")
+	return out, nil
 }

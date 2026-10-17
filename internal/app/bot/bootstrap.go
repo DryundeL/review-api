@@ -21,14 +21,16 @@ import (
 
 const serviceName = "review-api-bot"
 
-type userEnsurer interface {
+type userGateway interface {
 	EnsureUser(context.Context, contract.TelegramProfile) error
+	NotificationsMuted(context.Context, int64) (bool, error)
+	SetNotificationsMuted(context.Context, int64, bool) error
 }
 
 type App struct {
 	db          *pgxpool.Pool
 	redis       *redis.Client
-	users       userEnsurer
+	users       userGateway
 	logins      loginGateway
 	client      *Client
 	log         *slog.Logger
@@ -86,6 +88,13 @@ func (a *App) Run(ctx context.Context) error {
 		defer a.redis.Close()
 	}
 	a.log.Info("bot started", "service", serviceName)
+	if err := a.client.SetMyCommands(ctx, []botCommand{
+		{Command: "start", Description: "Старт / Start"},
+		{Command: "mute", Description: "Выключить уведомления / Mute"},
+		{Command: "unmute", Description: "Включить уведомления / Unmute"},
+	}); err != nil {
+		a.log.Warn("bot commands not set", "error", err)
+	}
 	if err := a.client.SetChatMenuButton(ctx, 0, a.miniAppName, a.miniAppURL); err != nil {
 		a.log.Warn("default menu button not set", "error", err)
 	}
@@ -139,14 +148,23 @@ func (a *App) handle(ctx context.Context, update Update) error {
 	if id, ok := loginStartID(update); ok {
 		return a.handleLoginStart(ctx, update, id)
 	}
-	profile, chatID, ok := startProfile(update)
-	if !ok {
+	profile, chatID, ok := messageProfile(update)
+	if !ok || chatID == 0 {
 		return nil
 	}
-	return a.openPrivateChat(ctx, profile, chatID)
+	switch classifyMessage(update.Message.Text, profile.LanguageCode) {
+	case actionStart:
+		return a.openPrivateChat(ctx, profile, chatID)
+	case actionMute:
+		return a.setNotificationsMuted(ctx, profile, chatID, true)
+	case actionUnmute:
+		return a.setNotificationsMuted(ctx, profile, chatID, false)
+	default:
+		return nil
+	}
 }
 
-// openPrivateChat creates the profile and attaches Mini App menu + reply keyboard.
+// openPrivateChat creates the profile and attaches Mini App menu + command keyboard.
 // Login deep-links skip plain /start, so they must call this themselves.
 func (a *App) openPrivateChat(ctx context.Context, profile contract.TelegramProfile, chatID int64) error {
 	if err := a.users.EnsureUser(ctx, profile); err != nil {
@@ -160,7 +178,11 @@ func (a *App) openPrivateChat(ctx context.Context, profile contract.TelegramProf
 	if chatID == 0 || a.miniAppURL == "" {
 		return nil
 	}
-	view := startMessage(profile, a.miniAppURL, a.miniAppName)
+	muted, err := a.users.NotificationsMuted(ctx, profile.TelegramID)
+	if err != nil && !errors.Is(err, contract.ErrNotFound) {
+		return err
+	}
+	view := startMessage(profile, a.miniAppName, muted)
 	if err := a.client.SetChatMenuButton(ctx, chatID, view.MenuButton, a.miniAppURL); err != nil {
 		var api *APIError
 		if errors.As(err, &api) && !api.Temporary() {
@@ -170,6 +192,20 @@ func (a *App) openPrivateChat(ctx context.Context, profile contract.TelegramProf
 		}
 	}
 	return a.send(ctx, chatID, view.Text, view.Markup)
+}
+
+func (a *App) setNotificationsMuted(ctx context.Context, profile contract.TelegramProfile, chatID int64, muted bool) error {
+	if err := a.users.EnsureUser(ctx, profile); err != nil {
+		if errors.Is(err, contract.ErrInvalidProfile) {
+			return nil
+		}
+		return err
+	}
+	if err := a.users.SetNotificationsMuted(ctx, profile.TelegramID, muted); err != nil {
+		return err
+	}
+	ru := isRussian(profile.LanguageCode)
+	return a.send(ctx, chatID, muteReply(ru, muted), commandsKeyboard(ru, muted))
 }
 
 func retryDelay(err error) time.Duration {

@@ -10,6 +10,8 @@ import (
 
 type UserRepository interface {
 	Upsert(ctx context.Context, user domain.User) error
+	NotificationsMuted(ctx context.Context, telegramID int64) (bool, error)
+	SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error
 }
 
 // ProfileCard is a user row plus follow stats for profile screens.

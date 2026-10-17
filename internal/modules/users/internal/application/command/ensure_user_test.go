@@ -23,6 +23,14 @@ func (f *fakeRepo) Upsert(_ context.Context, user domain.User) error {
 	return nil
 }
 
+func (f *fakeRepo) NotificationsMuted(_ context.Context, _ int64) (bool, error) {
+	return false, nil
+}
+
+func (f *fakeRepo) SetNotificationsMuted(_ context.Context, _ int64, _ bool) error {
+	return nil
+}
+
 func TestEnsureUserHandlerUpsertsProfile(t *testing.T) {
 	t.Parallel()
 	repo := &fakeRepo{}

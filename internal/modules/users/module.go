@@ -10,6 +10,7 @@ import (
 	authcontract "review-api/internal/modules/auth/contract"
 	"review-api/internal/modules/users/contract"
 	"review-api/internal/modules/users/internal/application/command"
+	"review-api/internal/modules/users/internal/application/ports"
 	"review-api/internal/modules/users/internal/application/query"
 	usershttp "review-api/internal/modules/users/internal/delivery/http"
 	"review-api/internal/modules/users/internal/infrastructure/read"
@@ -24,13 +25,16 @@ type Dependencies struct {
 type Module struct {
 	ensure  *command.EnsureUserHandler
 	profile *query.GetProfileHandler
+	prefs   ports.UserRepository
 	auth    echo.MiddlewareFunc
 }
 
 func New(deps Dependencies) *Module {
+	writeRepo := write.NewRepository(deps.Pool)
 	return &Module{
-		ensure:  command.NewEnsureUserHandler(write.NewRepository(deps.Pool), nil),
+		ensure:  command.NewEnsureUserHandler(writeRepo, nil),
 		profile: query.NewGetProfileHandler(read.NewRepository(deps.Pool)),
+		prefs:   writeRepo,
 		auth:    deps.Auth,
 	}
 }
@@ -59,6 +63,20 @@ func (m *Module) UserID(ctx context.Context, telegramID int64) (uuid.UUID, error
 		return uuid.Nil, err
 	}
 	return user.ID, nil
+}
+
+func (m *Module) NotificationsMuted(ctx context.Context, telegramID int64) (bool, error) {
+	if m == nil || m.prefs == nil {
+		return false, contract.ErrNotFound
+	}
+	return m.prefs.NotificationsMuted(ctx, telegramID)
+}
+
+func (m *Module) SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error {
+	if m == nil || m.prefs == nil {
+		return contract.ErrNotFound
+	}
+	return m.prefs.SetNotificationsMuted(ctx, telegramID, muted)
 }
 
 func (m *Module) SetAuth(auth echo.MiddlewareFunc) {

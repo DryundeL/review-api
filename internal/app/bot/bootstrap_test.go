@@ -18,12 +18,22 @@ type fakeUsers struct {
 	profile contract.TelegramProfile
 	err     error
 	calls   int
+	muted   bool
 }
 
 func (f *fakeUsers) EnsureUser(_ context.Context, profile contract.TelegramProfile) error {
 	f.calls++
 	f.profile = profile
 	return f.err
+}
+
+func (f *fakeUsers) NotificationsMuted(_ context.Context, _ int64) (bool, error) {
+	return f.muted, nil
+}
+
+func (f *fakeUsers) SetNotificationsMuted(_ context.Context, _ int64, muted bool) error {
+	f.muted = muted
+	return nil
 }
 
 func TestHandleStartSavesProfileAndReplies(t *testing.T) {
@@ -72,13 +82,75 @@ func TestHandleStartSavesProfileAndReplies(t *testing.T) {
 	}
 	message := bodies["/bot123456:abcDEF_token-1/sendMessage"]
 	text, _ := message["text"].(string)
-	if !strings.Contains(text, "Hi, Ann Lee (@ann).") || !strings.Contains(text, "Your options are below.") {
+	if !strings.Contains(text, "Hi, Ann Lee (@ann).") || !strings.Contains(text, "Notifications: on.") {
 		t.Fatalf("text = %q", text)
 	}
 	markup, _ := message["reply_markup"].(map[string]any)
 	rows, _ := markup["keyboard"].([]any)
 	if len(rows) != 1 || markup["is_persistent"] != true {
 		t.Fatalf("markup = %#v", message["reply_markup"])
+	}
+	row, _ := rows[0].([]any)
+	if len(row) != 2 {
+		t.Fatalf("keyboard row = %#v", rows[0])
+	}
+	startBtn, _ := row[0].(map[string]any)
+	muteBtn, _ := row[1].(map[string]any)
+	if startBtn["text"] != "Start" || muteBtn["text"] != "Mute notifications" {
+		t.Fatalf("buttons = %#v %#v", startBtn, muteBtn)
+	}
+	if _, hasWebApp := startBtn["web_app"]; hasWebApp {
+		t.Fatal("expected no web_app on command keyboard")
+	}
+}
+
+func TestHandleMuteUpdatesKeyboard(t *testing.T) {
+	t.Parallel()
+	var last map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if strings.HasSuffix(r.URL.Path, "/sendMessage") {
+			last = body
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"ok":true,"result":true}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	store := &fakeUsers{}
+	client := NewClient("123456:abcDEF_token-1")
+	client.base = srv.URL
+	app := &App{
+		users:       store,
+		client:      client,
+		log:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		miniAppURL:  "https://app.example.com",
+		miniAppName: "Review Hub",
+	}
+	err := app.handle(context.Background(), Update{
+		Message: &Message{
+			From: &User{ID: 42, FirstName: "Ann", LanguageCode: "ru"},
+			Chat: Chat{ID: 42, Type: "private"},
+			Text: "/mute",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !store.muted {
+		t.Fatal("expected muted")
+	}
+	text, _ := last["text"].(string)
+	if !strings.Contains(text, "Уведомления выключены") {
+		t.Fatalf("text = %q", text)
+	}
+	markup, _ := last["reply_markup"].(map[string]any)
+	rows, _ := markup["keyboard"].([]any)
+	row, _ := rows[0].([]any)
+	unmute, _ := row[1].(map[string]any)
+	if unmute["text"] != "Включить уведомления" {
+		t.Fatalf("keyboard = %#v", markup)
 	}
 }
 

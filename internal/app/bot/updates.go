@@ -17,16 +17,24 @@ type replyMarkup struct {
 }
 
 type keyboardButton struct {
-	Text   string     `json:"text"`
-	WebApp webAppInfo `json:"web_app"`
+	Text string `json:"text"`
 }
 
 type webAppInfo struct {
 	URL string `json:"url"`
 }
 
-func startProfile(update Update) (contract.TelegramProfile, int64, bool) {
-	if update.Message == nil || update.Message.From == nil || !isStartCommand(update.Message.Text) {
+type botAction int
+
+const (
+	actionNone botAction = iota
+	actionStart
+	actionMute
+	actionUnmute
+)
+
+func messageProfile(update Update) (contract.TelegramProfile, int64, bool) {
+	if update.Message == nil || update.Message.From == nil {
 		return contract.TelegramProfile{}, 0, false
 	}
 	from := update.Message.From
@@ -45,8 +53,43 @@ func startProfile(update Update) (contract.TelegramProfile, int64, bool) {
 	}, chatID, true
 }
 
+func startProfile(update Update) (contract.TelegramProfile, int64, bool) {
+	profile, chatID, ok := messageProfile(update)
+	if !ok || classifyMessage(update.Message.Text, profile.LanguageCode) != actionStart {
+		return contract.TelegramProfile{}, 0, false
+	}
+	return profile, chatID, true
+}
+
+func classifyMessage(text, languageCode string) botAction {
+	fields := strings.Fields(strings.TrimSpace(text))
+	if len(fields) == 0 {
+		return actionNone
+	}
+	command, _, _ := strings.Cut(fields[0], "@")
+	switch strings.ToLower(command) {
+	case "/start":
+		return actionStart
+	case "/mute":
+		return actionMute
+	case "/unmute":
+		return actionUnmute
+	}
+
+	ru := isRussian(languageCode)
+	switch strings.TrimSpace(text) {
+	case btnStart(ru):
+		return actionStart
+	case btnMute(ru):
+		return actionMute
+	case btnUnmute(ru):
+		return actionUnmute
+	}
+	return actionNone
+}
+
 func isStartCommand(text string) bool {
-	fields := strings.Fields(text)
+	fields := strings.Fields(strings.TrimSpace(text))
 	if len(fields) == 0 {
 		return false
 	}
@@ -82,7 +125,7 @@ type startView struct {
 	MenuButton string
 }
 
-func startMessage(profile contract.TelegramProfile, appURL, appName string) startView {
+func startMessage(profile contract.TelegramProfile, appName string, muted bool) startView {
 	ru := isRussian(profile.LanguageCode)
 	name := strings.TrimSpace(visibleText(profile.FirstName, 64) + " " + visibleText(profile.LastName, 64))
 	if name == "" {
@@ -117,28 +160,80 @@ func startMessage(profile contract.TelegramProfile, appURL, appName string) star
 			text.WriteString("Premium: yes\n")
 		}
 	}
+	text.WriteString("\n")
+	text.WriteString(notificationsStatus(ru, muted))
 	if ru {
-		text.WriteString("\nТвои возможности ниже.")
+		text.WriteString("\n\nКоманды — кнопками ниже или через /.")
 	} else {
-		text.WriteString("\nYour options are below.")
+		text.WriteString("\n\nUse the buttons below or / commands.")
 	}
 
-	keyboardLabel := "Open menu"
-	if ru {
-		keyboardLabel = "Открыть меню"
-	}
 	return startView{
-		Text: text.String(),
-		Markup: replyMarkup{
-			Keyboard: [][]keyboardButton{{{
-				Text:   keyboardLabel,
-				WebApp: webAppInfo{URL: appURL},
-			}}},
-			ResizeKeyboard: true,
-			IsPersistent:   true,
-		},
+		Text:       text.String(),
+		Markup:     commandsKeyboard(ru, muted),
 		MenuButton: appName,
 	}
+}
+
+func commandsKeyboard(ru, muted bool) replyMarkup {
+	toggle := btnMute(ru)
+	if muted {
+		toggle = btnUnmute(ru)
+	}
+	return replyMarkup{
+		Keyboard: [][]keyboardButton{
+			{{Text: btnStart(ru)}, {Text: toggle}},
+		},
+		ResizeKeyboard: true,
+		IsPersistent:   true,
+	}
+}
+
+func btnStart(ru bool) string {
+	if ru {
+		return "Старт"
+	}
+	return "Start"
+}
+
+func btnMute(ru bool) string {
+	if ru {
+		return "Выключить уведомления"
+	}
+	return "Mute notifications"
+}
+
+func btnUnmute(ru bool) string {
+	if ru {
+		return "Включить уведомления"
+	}
+	return "Unmute notifications"
+}
+
+func notificationsStatus(ru bool, muted bool) string {
+	if muted {
+		if ru {
+			return "Уведомления: выключены."
+		}
+		return "Notifications: muted."
+	}
+	if ru {
+		return "Уведомления: включены."
+	}
+	return "Notifications: on."
+}
+
+func muteReply(ru, muted bool) string {
+	if muted {
+		if ru {
+			return "Уведомления выключены. Бот больше не будет присылать пуши."
+		}
+		return "Notifications muted. The bot will not send pushes."
+	}
+	if ru {
+		return "Уведомления включены."
+	}
+	return "Notifications enabled."
 }
 
 func isRussian(languageCode string) bool {

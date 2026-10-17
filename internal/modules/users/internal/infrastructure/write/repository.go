@@ -2,10 +2,14 @@ package write
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"review-api/internal/modules/users/contract"
 	"review-api/internal/modules/users/internal/domain"
 	"review-api/internal/platform/transaction"
 )
@@ -49,6 +53,41 @@ func (r *Repository) Upsert(ctx context.Context, user domain.User) error {
 	return nil
 }
 
+func (r *Repository) NotificationsMuted(ctx context.Context, telegramID int64) (bool, error) {
+	if r == nil || r.pool == nil || telegramID <= 0 {
+		return false, contract.ErrNotFound
+	}
+	const query = `SELECT notifications_muted FROM users WHERE telegram_id = $1`
+	var muted bool
+	err := r.queryRow(ctx, query, telegramID).Scan(&muted)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, contract.ErrNotFound
+	}
+	if err != nil {
+		return false, fmt.Errorf("notifications muted: %w", err)
+	}
+	return muted, nil
+}
+
+func (r *Repository) SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error {
+	if r == nil || r.pool == nil || telegramID <= 0 {
+		return contract.ErrNotFound
+	}
+	const query = `
+		UPDATE users
+		SET notifications_muted = $2, updated_at = NOW()
+		WHERE telegram_id = $1
+	`
+	tag, err := r.execTag(ctx, query, telegramID, muted)
+	if err != nil {
+		return fmt.Errorf("set notifications muted: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return contract.ErrNotFound
+	}
+	return nil
+}
+
 func nullString(value string) any {
 	if value == "" {
 		return nil
@@ -57,10 +96,20 @@ func nullString(value string) any {
 }
 
 func (r *Repository) exec(ctx context.Context, sql string, args ...any) error {
-	if tx, ok := transaction.TxFromContext(ctx); ok {
-		_, err := tx.Exec(ctx, sql, args...)
-		return err
-	}
-	_, err := r.pool.Exec(ctx, sql, args...)
+	_, err := r.execTag(ctx, sql, args...)
 	return err
+}
+
+func (r *Repository) execTag(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+	if tx, ok := transaction.TxFromContext(ctx); ok {
+		return tx.Exec(ctx, sql, args...)
+	}
+	return r.pool.Exec(ctx, sql, args...)
+}
+
+func (r *Repository) queryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	if tx, ok := transaction.TxFromContext(ctx); ok {
+		return tx.QueryRow(ctx, sql, args...)
+	}
+	return r.pool.QueryRow(ctx, sql, args...)
 }

@@ -107,6 +107,18 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64) ([]Update, error)
 	return updates, nil
 }
 
+type botCommand struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
+
+func (c *Client) SetMyCommands(ctx context.Context, commands []botCommand) error {
+	if len(commands) == 0 || len(commands) > 100 {
+		return fmt.Errorf("telegram setMyCommands: invalid request")
+	}
+	return c.post(ctx, "setMyCommands", map[string]any{"commands": commands}, nil)
+}
+
 func (c *Client) SetChatMenuButton(ctx context.Context, chatID int64, text, appURL string) error {
 	if text == "" || appURL == "" || utf8.RuneCountInString(text) > 16 {
 		return fmt.Errorf("telegram setChatMenuButton: invalid request")

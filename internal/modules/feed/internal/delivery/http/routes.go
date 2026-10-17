@@ -7,11 +7,11 @@ import (
 )
 
 func Register(g *echo.Group, h *Handler, auth echo.MiddlewareFunc) {
-	g.GET("/feed", h.ListFeed, requireAuthForFollowing(auth))
+	g.GET("/feed", h.ListFeed, feedAuth(auth))
 }
 
-// requireAuthForFollowing runs Bearer only when mode=following.
-func requireAuthForFollowing(auth echo.MiddlewareFunc) echo.MiddlewareFunc {
+// feedAuth: Bearer optional for isFollowing; required when mode=following.
+func feedAuth(auth echo.MiddlewareFunc) echo.MiddlewareFunc {
 	if auth == nil {
 		auth = func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
@@ -24,7 +24,10 @@ func requireAuthForFollowing(auth echo.MiddlewareFunc) echo.MiddlewareFunc {
 			if c.QueryParam("mode") == ports.ModeFollowing {
 				return auth(next)(c)
 			}
-			return next(c)
+			if c.Request().Header.Get(echo.HeaderAuthorization) == "" {
+				return next(c)
+			}
+			return auth(next)(c)
 		}
 	}
 }

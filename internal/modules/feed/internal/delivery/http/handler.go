@@ -36,7 +36,6 @@ type feedItemJSON struct {
 	MediaObject   *mediaObjectJSON `json:"mediaObject,omitempty"`
 	Title         string           `json:"title"`
 	Rating        int16            `json:"rating"`
-	Status        string           `json:"status"`
 	HasSpoilers   bool             `json:"hasSpoilers"`
 	LikesCount    int64            `json:"likesCount"`
 	DislikesCount int64            `json:"dislikesCount"`
@@ -44,8 +43,9 @@ type feedItemJSON struct {
 }
 
 type authorJSON struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	IsFollowing bool   `json:"isFollowing"`
 }
 
 type mediaObjectJSON struct {
@@ -62,13 +62,9 @@ type feedResponse struct {
 
 func (h *Handler) ListFeed(c echo.Context) error {
 	mode := c.QueryParam("mode")
-	var viewerID uuid.UUID
-	if mode == ports.ModeFollowing {
-		id, err := h.resolveUser(c)
-		if err != nil {
-			return err
-		}
-		viewerID = id
+	viewerID, err := h.resolveViewer(c, mode == ports.ModeFollowing)
+	if err != nil {
+		return err
 	}
 
 	page, err := h.list.Handle(c.Request().Context(), query.ListInput{
@@ -94,10 +90,14 @@ func (h *Handler) ListFeed(c echo.Context) error {
 	return c.JSON(http.StatusOK, feedResponse{Items: items, NextCursor: next})
 }
 
-func (h *Handler) resolveUser(c echo.Context) (uuid.UUID, error) {
+// resolveViewer returns viewer id. required=true → 401 without auth.
+func (h *Handler) resolveViewer(c echo.Context, required bool) (uuid.UUID, error) {
 	id, err := authcontract.IdentityFromContext(c.Request().Context())
 	if err != nil {
-		return uuid.Nil, httperr.Unauthorized("unauthorized")
+		if required {
+			return uuid.Nil, httperr.Unauthorized("unauthorized")
+		}
+		return uuid.Nil, nil
 	}
 	userID, err := h.users.UserID(c.Request().Context(), id.TelegramID)
 	if err != nil {
@@ -123,13 +123,13 @@ func itemJSON(item ports.Item) feedItemJSON {
 		ID:       item.ID.String(),
 		AuthorID: item.AuthorID.String(),
 		Author: authorJSON{
-			ID:       item.Author.ID.String(),
-			Username: item.Author.Username,
+			ID:          item.Author.ID.String(),
+			Username:    item.Author.Username,
+			IsFollowing: item.Author.IsFollowing,
 		},
 		MediaObject:   mediaJSON(item.MediaObject),
 		Title:         item.Title,
 		Rating:        item.Rating,
-		Status:        item.Status,
 		HasSpoilers:   item.HasSpoilers,
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,

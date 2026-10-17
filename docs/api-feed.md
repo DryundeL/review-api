@@ -18,12 +18,12 @@
 
 | mode | Auth |
 |---|---|
-| `all` | не нужен |
+| `all` | опционален; с Bearer заполняется `author.isFollowing` |
 | `following` | `Authorization: Bearer <jwt>` обязателен, иначе `401` |
 
 ### Response `200`
 
-Тот же list-item, что у профиля (`GET /v1/profiles/:id/reviews` / `GET /v1/profile/reviews`): без `blocks`, со счётчиками и `mediaObject`. Дополнительно объект `author` с ником TG.
+Без `status` (в ленте только published). Без `blocks`. Есть `author` с ником и флагом подписки.
 
 ```json
 {
@@ -33,7 +33,8 @@
       "authorId": "uuid",
       "author": {
         "id": "uuid",
-        "username": "ann"
+        "username": "ann",
+        "isFollowing": true
       },
       "mediaObject": {
         "id": "uuid",
@@ -43,7 +44,6 @@
       },
       "title": "Заголовок обзора",
       "rating": 8,
-      "status": "published",
       "hasSpoilers": false,
       "likesCount": 12,
       "dislikesCount": 1,
@@ -54,10 +54,11 @@
 }
 ```
 
-- Всегда только `status: "published"` — фильтра published на клиенте нет.
+- `status` нет — только у своих обзоров на профиле (`/profile/reviews`).
+- `author.isFollowing` — подписан ли текущий юзер на автора. Без auth → всегда `false`. На свои посты → `false`.
 - `nextCursor`: `string` или `null`. Если `null` — конец ленты.
-- `author.username` — ник Telegram **без** `@`. Может быть `""` — UI fallback / плейсхолдер.
-- `author.id` === `authorId` — `GET /v1/profiles/{id}`, обзоры, подписка. См. [api-social.md](api-social.md).
+- `author.username` — ник Telegram **без** `@`. Может быть `""`.
+- `author.id` === `authorId` — `GET /v1/profiles/{id}`, подписка. См. [api-social.md](api-social.md).
 
 ### Скролл / подгрузка
 
@@ -70,7 +71,7 @@
 
 | HTTP | Когда |
 |---|---|
-| `401` | `mode=following` без/с битым JWT |
+| `401` | `mode=following` без/с битым JWT; или битый Bearer при `mode=all` |
 | `422` | неверный `sort` / `mode` / битый или чужой `cursor` (`details.field`) |
 
 ### Примеры
@@ -78,6 +79,7 @@
 ```http
 GET /v1/feed
 GET /v1/feed?sort=views&limit=20
+Authorization: Bearer ...
 GET /v1/feed?sort=likes&type=manga&cursor=...
 GET /v1/feed?mode=following&sort=new
 Authorization: Bearer ...

@@ -44,10 +44,22 @@ func (r *Repository) List(ctx context.Context, p ports.ListParams) ([]ports.Item
 		return fmt.Sprintf("$%d", len(args))
 	}
 
+	viewerArg := arg(p.ViewerID)
+
 	b.WriteString(`
 		SELECT r.id, r.author_id, COALESCE(u.username, ''),
+			( `)
+	b.WriteString(viewerArg)
+	b.WriteString(` <> '00000000-0000-0000-0000-000000000000'::uuid
+				AND EXISTS (
+					SELECT 1 FROM follows f
+					WHERE f.follower_id = `)
+	b.WriteString(viewerArg)
+	b.WriteString(` AND f.followee_id = r.author_id
+				)
+			) AS is_following,
 			mo.id, mo.title, mo.type, mo.poster_url,
-			r.title, r.rating, r.status, `)
+			r.title, r.rating, `)
 	b.WriteString(spoilersExistSQL)
 	b.WriteString(`,
 			r.likes_count,
@@ -67,7 +79,7 @@ func (r *Repository) List(ctx context.Context, p ports.ListParams) ([]ports.Item
 		b.WriteString(` AND EXISTS (
 			SELECT 1 FROM follows f
 			WHERE f.follower_id = `)
-		b.WriteString(arg(p.ViewerID))
+		b.WriteString(viewerArg)
 		b.WriteString(` AND f.followee_id = r.author_id
 		)`)
 	}
@@ -142,9 +154,9 @@ func scanItem(row interface {
 	var item ports.Item
 	var poster *string
 	err := row.Scan(
-		&item.ID, &item.AuthorID, &item.Author.Username,
+		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.IsFollowing,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
-		&item.Title, &item.Rating, &item.Status,
+		&item.Title, &item.Rating,
 		&item.HasSpoilers,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
 		&item.CreatedAt,

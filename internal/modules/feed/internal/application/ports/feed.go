@@ -26,8 +26,9 @@ type MediaObjectRef struct {
 
 // AuthorRef is the review author for feed cards (TG nick may be empty).
 type AuthorRef struct {
-	ID       uuid.UUID
-	Username string
+	ID          uuid.UUID
+	Username    string
+	IsFollowing bool
 }
 
 // Item is one published review in the feed (list shape, no blocks).
@@ -38,7 +39,6 @@ type Item struct {
 	MediaObject   MediaObjectRef
 	Title         string
 	Rating        int16
-	Status        string
 	HasSpoilers   bool
 	LikesCount    int64
 	DislikesCount int64

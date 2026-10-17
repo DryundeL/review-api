@@ -95,16 +95,59 @@ func (r *ReviewRepository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (r *ReviewRepository) UpsertVote(ctx context.Context, reviewID, userID uuid.UUID, isLike bool) error {
-	const query = `
+	var prevLike bool
+	err := r.queryRow(ctx, `
+		SELECT is_like FROM review_votes WHERE review_id = $1 AND user_id = $2
+	`, reviewID, userID).Scan(&prevLike)
+	var prev *bool
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		prev = nil
+	case err != nil:
+		return fmt.Errorf("get vote: %w", err)
+	default:
+		prev = &prevLike
+	}
+
+	const upsert = `
 		INSERT INTO review_votes (review_id, user_id, is_like)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (review_id, user_id) DO UPDATE
 		SET is_like = EXCLUDED.is_like, updated_at = NOW()
 	`
-	if err := r.exec(ctx, query, reviewID, userID, isLike); err != nil {
+	if err := r.exec(ctx, upsert, reviewID, userID, isLike); err != nil {
+		return mapReviewWriteError(err)
+	}
+
+	delta := voteLikesDelta(prev, isLike)
+	if delta == 0 {
+		return nil
+	}
+	const bump = `
+		UPDATE reviews
+		SET likes_count = GREATEST(0, likes_count + $2)
+		WHERE id = $1
+	`
+	if err := r.exec(ctx, bump, reviewID, delta); err != nil {
 		return mapReviewWriteError(err)
 	}
 	return nil
+}
+
+func voteLikesDelta(prev *bool, isLike bool) int {
+	if prev == nil {
+		if isLike {
+			return 1
+		}
+		return 0
+	}
+	if *prev == isLike {
+		return 0
+	}
+	if isLike {
+		return 1
+	}
+	return -1
 }
 
 func (r *ReviewRepository) InsertView(ctx context.Context, reviewID, userID uuid.UUID) (bool, error) {
@@ -117,7 +160,18 @@ func (r *ReviewRepository) InsertView(ctx context.Context, reviewID, userID uuid
 	if err != nil {
 		return false, mapReviewWriteError(err)
 	}
-	return tag.RowsAffected() > 0, nil
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+	const bump = `
+		UPDATE reviews
+		SET views_count = views_count + 1
+		WHERE id = $1
+	`
+	if err := r.exec(ctx, bump, reviewID); err != nil {
+		return false, mapReviewWriteError(err)
+	}
+	return true, nil
 }
 
 func (r *ReviewRepository) insertBlocks(ctx context.Context, reviewID uuid.UUID, blocks []domain.Block) error {

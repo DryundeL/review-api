@@ -1,9 +1,11 @@
 package usershttp
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"review-api/internal/http/httperr"
@@ -12,12 +14,17 @@ import (
 	"review-api/internal/modules/users/internal/application/query"
 )
 
-type Handler struct {
-	profile *query.GetProfileHandler
+type UserResolver interface {
+	UserID(ctx context.Context, telegramID int64) (uuid.UUID, error)
 }
 
-func NewHandler(profile *query.GetProfileHandler) *Handler {
-	return &Handler{profile: profile}
+type Handler struct {
+	profile *query.GetProfileHandler
+	users   UserResolver
+}
+
+func NewHandler(profile *query.GetProfileHandler, users UserResolver) *Handler {
+	return &Handler{profile: profile, users: users}
 }
 
 func (h *Handler) Profile(c echo.Context) error {
@@ -25,7 +32,7 @@ func (h *Handler) Profile(c echo.Context) error {
 	if err != nil {
 		return httperr.Unauthorized("unauthorized")
 	}
-	user, err := h.profile.Handle(c.Request().Context(), id.TelegramID)
+	card, err := h.profile.Own(c.Request().Context(), id.TelegramID)
 	if errors.Is(err, contract.ErrNotFound) {
 		return httperr.Unauthorized("unauthorized")
 	}
@@ -33,23 +40,77 @@ func (h *Handler) Profile(c echo.Context) error {
 		return err
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
-	return c.JSON(http.StatusOK, profileResponse{
-		ID:           user.ID.String(),
-		TelegramID:   user.TelegramID,
-		Username:     user.Username,
-		FirstName:    user.FirstName,
-		LastName:     user.LastName,
-		LanguageCode: user.LanguageCode,
-		IsPremium:    user.IsPremium,
-	})
+	return c.JSON(http.StatusOK, profileJSON(card, true))
+}
+
+func (h *Handler) PublicProfile(c echo.Context) error {
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil || userID == uuid.Nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "user not found")
+	}
+	viewerID, err := h.optionalViewer(c)
+	if err != nil {
+		return err
+	}
+	card, err := h.profile.ByID(c.Request().Context(), userID, viewerID)
+	if errors.Is(err, contract.ErrNotFound) {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "user not found")
+	}
+	if err != nil {
+		return err
+	}
+	if card.IsMe {
+		c.Response().Header().Set("Cache-Control", "no-store")
+	}
+	return c.JSON(http.StatusOK, profileJSON(card, card.IsMe))
+}
+
+func (h *Handler) optionalViewer(c echo.Context) (uuid.UUID, error) {
+	id, err := authcontract.IdentityFromContext(c.Request().Context())
+	if err != nil {
+		return uuid.Nil, nil
+	}
+	if h.users == nil {
+		return uuid.Nil, nil
+	}
+	userID, err := h.users.UserID(c.Request().Context(), id.TelegramID)
+	if err != nil {
+		return uuid.Nil, httperr.Unauthorized("unauthorized")
+	}
+	return userID, nil
 }
 
 type profileResponse struct {
-	ID           string `json:"id"`
-	TelegramID   int64  `json:"telegramId"`
-	Username     string `json:"username"`
-	FirstName    string `json:"firstName"`
-	LastName     string `json:"lastName"`
-	LanguageCode string `json:"languageCode"`
-	IsPremium    bool   `json:"isPremium"`
+	ID             string `json:"id"`
+	Username       string `json:"username"`
+	FirstName      string `json:"firstName"`
+	LastName       string `json:"lastName"`
+	FollowersCount int64  `json:"followersCount"`
+	FollowingCount int64  `json:"followingCount"`
+	IsFollowing    bool   `json:"isFollowing"`
+	IsMe           bool   `json:"isMe"`
+	TelegramID     *int64 `json:"telegramId,omitempty"`
+	LanguageCode   string `json:"languageCode,omitempty"`
+	IsPremium      *bool  `json:"isPremium,omitempty"`
+}
+
+func profileJSON(card query.Card, includePrivate bool) profileResponse {
+	out := profileResponse{
+		ID:             card.User.ID.String(),
+		Username:       card.User.Username,
+		FirstName:      card.User.FirstName,
+		LastName:       card.User.LastName,
+		FollowersCount: card.FollowersCount,
+		FollowingCount: card.FollowingCount,
+		IsFollowing:    card.IsFollowing,
+		IsMe:           card.IsMe,
+	}
+	if includePrivate {
+		tid := card.User.TelegramID
+		prem := card.User.IsPremium
+		out.TelegramID = &tid
+		out.LanguageCode = card.User.LanguageCode
+		out.IsPremium = &prem
+	}
+	return out
 }

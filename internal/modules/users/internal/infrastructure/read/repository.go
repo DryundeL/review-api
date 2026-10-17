@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"review-api/internal/modules/users/contract"
+	"review-api/internal/modules/users/internal/application/ports"
 	"review-api/internal/modules/users/internal/domain"
 )
 
@@ -21,34 +23,78 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) FindByTelegramID(ctx context.Context, telegramID int64) (domain.User, error) {
-	if r == nil || r.pool == nil || telegramID <= 0 {
-		return domain.User{}, contract.ErrNotFound
+	card, err := r.FindCardByTelegramID(ctx, telegramID, uuid.Nil)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return card.User, nil
+}
+
+func (r *Repository) FindCardByID(ctx context.Context, userID, viewerID uuid.UUID) (ports.ProfileCard, error) {
+	if r == nil || r.pool == nil || userID == uuid.Nil {
+		return ports.ProfileCard{}, contract.ErrNotFound
 	}
 	const query = `
-		SELECT id, telegram_id,
-			COALESCE(username, ''),
-			first_name,
-			COALESCE(last_name, ''),
-			COALESCE(language_code, ''),
-			is_premium
-		FROM users
-		WHERE telegram_id = $1
+		SELECT u.id, u.telegram_id,
+			COALESCE(u.username, ''),
+			u.first_name,
+			COALESCE(u.last_name, ''),
+			COALESCE(u.language_code, ''),
+			u.is_premium,
+			(SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.id),
+			(SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id),
+			EXISTS (
+				SELECT 1 FROM follows f
+				WHERE f.follower_id = $2 AND f.followee_id = u.id AND $2 <> '00000000-0000-0000-0000-000000000000'::uuid
+			)
+		FROM users u
+		WHERE u.id = $1
 	`
-	var user domain.User
-	err := r.pool.QueryRow(ctx, query, telegramID).Scan(
-		&user.ID,
-		&user.TelegramID,
-		&user.Username,
-		&user.FirstName,
-		&user.LastName,
-		&user.LanguageCode,
-		&user.IsPremium,
+	return r.scanCard(r.pool.QueryRow(ctx, query, userID, viewerID))
+}
+
+func (r *Repository) FindCardByTelegramID(ctx context.Context, telegramID int64, viewerID uuid.UUID) (ports.ProfileCard, error) {
+	if r == nil || r.pool == nil || telegramID <= 0 {
+		return ports.ProfileCard{}, contract.ErrNotFound
+	}
+	const query = `
+		SELECT u.id, u.telegram_id,
+			COALESCE(u.username, ''),
+			u.first_name,
+			COALESCE(u.last_name, ''),
+			COALESCE(u.language_code, ''),
+			u.is_premium,
+			(SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.id),
+			(SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id),
+			EXISTS (
+				SELECT 1 FROM follows f
+				WHERE f.follower_id = $2 AND f.followee_id = u.id AND $2 <> '00000000-0000-0000-0000-000000000000'::uuid
+			)
+		FROM users u
+		WHERE u.telegram_id = $1
+	`
+	return r.scanCard(r.pool.QueryRow(ctx, query, telegramID, viewerID))
+}
+
+func (r *Repository) scanCard(row pgx.Row) (ports.ProfileCard, error) {
+	var card ports.ProfileCard
+	err := row.Scan(
+		&card.User.ID,
+		&card.User.TelegramID,
+		&card.User.Username,
+		&card.User.FirstName,
+		&card.User.LastName,
+		&card.User.LanguageCode,
+		&card.User.IsPremium,
+		&card.FollowersCount,
+		&card.FollowingCount,
+		&card.IsFollowing,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.User{}, contract.ErrNotFound
+		return ports.ProfileCard{}, contract.ErrNotFound
 	}
 	if err != nil {
-		return domain.User{}, fmt.Errorf("find user: %w", err)
+		return ports.ProfileCard{}, fmt.Errorf("find profile card: %w", err)
 	}
-	return user, nil
+	return card, nil
 }

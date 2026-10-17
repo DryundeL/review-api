@@ -66,5 +66,5 @@ func (m *Module) SetAuth(auth echo.MiddlewareFunc) {
 }
 
 func (m *Module) RegisterHTTP(g *echo.Group) {
-	usershttp.Register(g, usershttp.NewHandler(m.profile), m.auth)
+	usershttp.Register(g, usershttp.NewHandler(m.profile, m), m.auth)
 }

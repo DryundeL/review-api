@@ -15,4 +15,17 @@ func Register(g *echo.Group, h *Handler, auth echo.MiddlewareFunc) {
 		}
 	}
 	g.GET("/profile", h.Profile, auth)
+	g.GET("/profiles/:id", h.PublicProfile, optionalAuth(auth))
+}
+
+// optionalAuth runs Bearer only when Authorization is present.
+func optionalAuth(auth echo.MiddlewareFunc) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if c.Request().Header.Get(echo.HeaderAuthorization) == "" {
+				return next(c)
+			}
+			return auth(next)(c)
+		}
+	}
 }

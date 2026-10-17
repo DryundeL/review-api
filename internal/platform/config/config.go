@@ -60,6 +60,7 @@ type AppConfig struct {
 	TelegramBotUsername string
 	JWTSecret           string
 	MiniAppURL          string
+	MiniAppName         string
 	AuthMaxAge          time.Duration
 	RateLimitPerMin     int
 	CORSOrigins         []string
@@ -119,6 +120,7 @@ func Load() (*Config, error) {
 			TelegramBotUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
 			JWTSecret:           os.Getenv("JWT_SECRET"),
 			MiniAppURL:          os.Getenv("MINI_APP_URL"),
+			MiniAppName:         getEnv("MINI_APP_NAME", "Review Hub"),
 			AuthMaxAge:          authMaxAge,
 			RateLimitPerMin:     rateLimit,
 			CORSOrigins:         parseCommaSeparatedList(os.Getenv("APP_CORS_ORIGINS")),

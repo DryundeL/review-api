@@ -108,17 +108,21 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64) ([]Update, error)
 }
 
 func (c *Client) SetChatMenuButton(ctx context.Context, chatID int64, text, appURL string) error {
-	if chatID <= 0 || text == "" || appURL == "" || utf8.RuneCountInString(text) > 32 {
+	if text == "" || appURL == "" || utf8.RuneCountInString(text) > 16 {
 		return fmt.Errorf("telegram setChatMenuButton: invalid request")
 	}
-	return c.post(ctx, "setChatMenuButton", map[string]any{
-		"chat_id": chatID,
+	payload := map[string]any{
 		"menu_button": map[string]any{
 			"type":    "web_app",
 			"text":    text,
 			"web_app": webAppInfo{URL: appURL},
 		},
-	}, nil)
+	}
+	// chat_id omitted → default menu button for all private chats (like BotFather /setmenubutton).
+	if chatID > 0 {
+		payload["chat_id"] = chatID
+	}
+	return c.post(ctx, "setChatMenuButton", payload, nil)
 }
 
 func (c *Client) EditMessage(ctx context.Context, chatID, messageID int64, text string) error {

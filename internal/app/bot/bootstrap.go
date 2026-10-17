@@ -26,13 +26,14 @@ type userEnsurer interface {
 }
 
 type App struct {
-	db         *pgxpool.Pool
-	redis      *redis.Client
-	users      userEnsurer
-	logins     loginGateway
-	client     *Client
-	log        *slog.Logger
-	miniAppURL string
+	db          *pgxpool.Pool
+	redis       *redis.Client
+	users       userEnsurer
+	logins      loginGateway
+	client      *Client
+	log         *slog.Logger
+	miniAppURL  string
+	miniAppName string
 }
 
 func Bootstrap(ctx context.Context) (*App, error) {
@@ -44,6 +45,10 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN format is invalid")
 	}
 	miniAppURL, err := parseMiniAppURL(cfg.App.MiniAppURL)
+	if err != nil {
+		return nil, err
+	}
+	miniAppName, err := parseMiniAppName(cfg.App.MiniAppName)
 	if err != nil {
 		return nil, err
 	}
@@ -64,13 +69,14 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		BotUsername: cfg.App.TelegramBotUsername,
 	})
 	return &App{
-		db:         pool,
-		redis:      rdb,
-		users:      users.New(users.Dependencies{Pool: pool}),
-		logins:     authMod,
-		client:     NewClient(cfg.App.TelegramBotToken),
-		log:        observability.Logger(),
-		miniAppURL: miniAppURL,
+		db:          pool,
+		redis:       rdb,
+		users:       users.New(users.Dependencies{Pool: pool}),
+		logins:      authMod,
+		client:      NewClient(cfg.App.TelegramBotToken),
+		log:         observability.Logger(),
+		miniAppURL:  miniAppURL,
+		miniAppName: miniAppName,
 	}, nil
 }
 
@@ -80,6 +86,9 @@ func (a *App) Run(ctx context.Context) error {
 		defer a.redis.Close()
 	}
 	a.log.Info("bot started", "service", serviceName)
+	if err := a.client.SetChatMenuButton(ctx, 0, a.miniAppName, a.miniAppURL); err != nil {
+		a.log.Warn("default menu button not set", "error", err)
+	}
 
 	var offset int64
 	for {
@@ -151,7 +160,7 @@ func (a *App) openPrivateChat(ctx context.Context, profile contract.TelegramProf
 	if chatID == 0 || a.miniAppURL == "" {
 		return nil
 	}
-	view := startMessage(profile, a.miniAppURL)
+	view := startMessage(profile, a.miniAppURL, a.miniAppName)
 	if err := a.client.SetChatMenuButton(ctx, chatID, view.MenuButton, a.miniAppURL); err != nil {
 		var api *APIError
 		if errors.As(err, &api) && !api.Temporary() {

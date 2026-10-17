@@ -78,13 +78,13 @@ func TestStartMessageKeepsMiniAppButton(t *testing.T) {
 		Username:     "anna",
 		LanguageCode: "ru",
 		IsPremium:    true,
-	}, appURL)
+	}, appURL, "Review Hub")
 	for _, part := range []string{"Привет, Анна Иванова (@anna).", "Telegram ID: 42", "Язык: ru", "Premium: да", "Твои возможности ниже."} {
 		if !strings.Contains(view.Text, part) {
 			t.Fatalf("text %q does not contain %q", view.Text, part)
 		}
 	}
-	if view.MenuButton != "Открыть" {
+	if view.MenuButton != "Review Hub" {
 		t.Fatalf("menu button = %q", view.MenuButton)
 	}
 	if !view.Markup.ResizeKeyboard || !view.Markup.IsPersistent {
@@ -96,6 +96,19 @@ func TestStartMessageKeepsMiniAppButton(t *testing.T) {
 	button := view.Markup.Keyboard[0][0]
 	if button.Text != "Открыть меню" || button.WebApp.URL != appURL {
 		t.Fatalf("button = %+v", button)
+	}
+}
+
+func TestParseMiniAppName(t *testing.T) {
+	t.Parallel()
+	got, err := parseMiniAppName(" Review Hub ")
+	if err != nil || got != "Review Hub" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+	for _, raw := range []string{"", "   ", "This name is way too long"} {
+		if _, err := parseMiniAppName(raw); err == nil {
+			t.Fatalf("expected error for %q", raw)
+		}
 	}
 }
 

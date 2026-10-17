@@ -66,13 +66,23 @@ func parseMiniAppURL(raw string) (string, error) {
 	return parsed.String(), nil
 }
 
+// parseMiniAppName validates the blue chat menu button label (Telegram: 1–16 chars).
+func parseMiniAppName(raw string) (string, error) {
+	name := strings.TrimSpace(raw)
+	n := utf8.RuneCountInString(name)
+	if n < 1 || n > 16 {
+		return "", fmt.Errorf("MINI_APP_NAME must be 1–16 characters")
+	}
+	return name, nil
+}
+
 type startView struct {
 	Text       string
 	Markup     replyMarkup
 	MenuButton string
 }
 
-func startMessage(profile contract.TelegramProfile, appURL string) startView {
+func startMessage(profile contract.TelegramProfile, appURL, appName string) startView {
 	ru := isRussian(profile.LanguageCode)
 	name := strings.TrimSpace(visibleText(profile.FirstName, 64) + " " + visibleText(profile.LastName, 64))
 	if name == "" {
@@ -113,10 +123,8 @@ func startMessage(profile contract.TelegramProfile, appURL string) startView {
 		text.WriteString("\nYour options are below.")
 	}
 
-	menuButton := "Open"
 	keyboardLabel := "Open menu"
 	if ru {
-		menuButton = "Открыть"
 		keyboardLabel = "Открыть меню"
 	}
 	return startView{
@@ -129,7 +137,7 @@ func startMessage(profile contract.TelegramProfile, appURL string) startView {
 			ResizeKeyboard: true,
 			IsPersistent:   true,
 		},
-		MenuButton: menuButton,
+		MenuButton: appName,
 	}
 }
 

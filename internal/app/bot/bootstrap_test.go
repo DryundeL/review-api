@@ -44,10 +44,11 @@ func TestHandleStartSavesProfileAndReplies(t *testing.T) {
 	client := NewClient("123456:abcDEF_token-1")
 	client.base = srv.URL
 	app := &App{
-		users:      store,
-		client:     client,
-		log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
-		miniAppURL: "https://app.example.com",
+		users:       store,
+		client:      client,
+		log:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		miniAppURL:  "https://app.example.com",
+		miniAppName: "Review Hub",
 	}
 
 	err := app.handle(context.Background(), Update{
@@ -66,7 +67,7 @@ func TestHandleStartSavesProfileAndReplies(t *testing.T) {
 	}
 	menu := bodies["/bot123456:abcDEF_token-1/setChatMenuButton"]
 	menuButton, _ := menu["menu_button"].(map[string]any)
-	if menuButton["type"] != "web_app" || menuButton["text"] != "Open" {
+	if menuButton["type"] != "web_app" || menuButton["text"] != "Review Hub" {
 		t.Fatalf("menu button = %#v", menu["menu_button"])
 	}
 	message := bodies["/bot123456:abcDEF_token-1/sendMessage"]

@@ -68,11 +68,12 @@ func TestHandleLoginConfirm(t *testing.T) {
 	client := NewClient("123456:abcDEF_token-1")
 	client.base = srv.URL
 	app := &App{
-		users:      users,
-		logins:     logins,
-		client:     client,
-		log:        slog.New(slog.NewTextHandler(io.Discard, nil)),
-		miniAppURL: "https://app.example.com",
+		users:       users,
+		logins:      logins,
+		client:      client,
+		log:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		miniAppURL:  "https://app.example.com",
+		miniAppName: "Review Hub",
 	}
 	err := app.handle(context.Background(), Update{
 		Message: &Message{
@@ -89,7 +90,7 @@ func TestHandleLoginConfirm(t *testing.T) {
 	}
 	menu := bodies["/bot123456:abcDEF_token-1/setChatMenuButton"]
 	menuButton, _ := menu["menu_button"].(map[string]any)
-	if menuButton["type"] != "web_app" || menuButton["text"] != "Открыть" {
+	if menuButton["type"] != "web_app" || menuButton["text"] != "Review Hub" {
 		t.Fatalf("menu button = %#v", menu["menu_button"])
 	}
 	if len(messages) != 2 {

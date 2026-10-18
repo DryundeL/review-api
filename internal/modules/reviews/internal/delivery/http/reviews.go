@@ -39,7 +39,7 @@ type reviewJSON struct {
 	MediaObject   *mediaObjectJSON `json:"mediaObject,omitempty"`
 	Title         string           `json:"title"`
 	Rating        int16            `json:"rating"`
-	Status        string           `json:"status"`
+	Status        string           `json:"status,omitempty"`
 	Blocks        []blockJSON      `json:"blocks,omitempty"`
 	HasSpoilers   bool             `json:"hasSpoilers"`
 	LikesCount    int64            `json:"likesCount"`
@@ -131,7 +131,9 @@ func (h *Handler) GetReview(c echo.Context) error {
 	if err != nil {
 		return mapReviewError(err)
 	}
-	return c.JSON(http.StatusOK, reviewResponse(item))
+	resp := reviewResponse(item)
+	resp.Status = ""
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) ListReviews(c echo.Context) error {

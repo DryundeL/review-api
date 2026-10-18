@@ -52,14 +52,14 @@ Prefs — одна строка на юзера с колонками `like_enab
   "items": [
     {
       "name": "follow",
-      "title": "Подписки",
-      "text": "Уведомления о новых подписчиках",
+      "title": "Подписка",
+      "text": "Новый подписчик",
       "enabled": true
     },
     {
       "name": "like",
-      "title": "Лайки",
-      "text": "Уведомления о лайках ваших обзоров",
+      "title": "Лайк",
+      "text": "Новый лайк на ваш обзор",
       "enabled": true
     }
   ]
@@ -80,4 +80,49 @@ Prefs — одна строка на юзера с колонками `like_enab
 
 **422** — пустой `items`, unknown / duplicate `name` (`field: items` или `name`).
 
-Глобальный mute (`notificationsMuted`) перекрывает per-type prefs: даже при `enabled: true` пуш не уйдёт, пока mute включён (когда появятся пуши).
+---
+
+## Inbox
+
+Правила доставки:
+
+| Pref | Результат |
+|---|---|
+| type `enabled: false` | ничего: ни inbox, ни бот |
+| type on + `notificationsMuted: true` | строка в inbox, бот молчит |
+| type on + mute off | inbox + сообщение от бота |
+
+Текст: `notification_types.text` + динамика (`: @user · «обзор»`).
+
+### `GET /v1/notifications?limit=20&offset=0`
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "type": "like",
+      "title": "Лайк",
+      "body": "Новый лайк на ваш обзор: @ann · «Neon»",
+      "actorId": "uuid",
+      "reviewId": "uuid",
+      "isRead": false,
+      "createdAt": "2026-10-18T12:00:00Z"
+    }
+  ]
+}
+```
+
+### `GET /v1/notifications/unread`
+
+```json
+{ "count": 3 }
+```
+
+### `PATCH /v1/notifications/{id}/read`
+
+**204** — отметить одно прочитанным.
+
+### `PATCH /v1/notifications/read`
+
+**204** — отметить все прочитанными.

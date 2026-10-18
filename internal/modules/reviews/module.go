@@ -78,6 +78,25 @@ func (m *Module) RequireActiveTypes(ctx context.Context, codes []string) error {
 	return m.types.RequireActive(ctx, codes)
 }
 
+// PublishedReviewRef returns author/title for a published review (notification consumers).
+func (m *Module) PublishedReviewRef(ctx context.Context, reviewID uuid.UUID) (contract.ReviewRef, error) {
+	if m == nil || m.getReview == nil || reviewID == uuid.Nil {
+		return contract.ReviewRef{}, contract.ErrNotFound
+	}
+	item, err := m.getReview.Handle(ctx, reviewID, uuid.Nil)
+	if err != nil {
+		return contract.ReviewRef{}, err
+	}
+	if item.Status != "published" {
+		return contract.ReviewRef{}, contract.ErrNotFound
+	}
+	return contract.ReviewRef{
+		ID:       item.ID,
+		AuthorID: item.AuthorID,
+		Title:    item.Title,
+	}, nil
+}
+
 func (m *Module) statusCatalog() reviewshttp.StatusCatalog {
 	return reviewshttp.StatusCatalog{
 		Publication: statusItems(PublicationStatuses()),

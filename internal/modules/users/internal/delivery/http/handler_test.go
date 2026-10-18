@@ -29,6 +29,13 @@ func (s stubProfiles) FindByTelegramID(context.Context, int64) (domain.User, err
 	return s.user, nil
 }
 
+func (s stubProfiles) FindByID(_ context.Context, userID uuid.UUID) (domain.User, error) {
+	if userID != s.user.ID {
+		return domain.User{}, contract.ErrNotFound
+	}
+	return s.user, nil
+}
+
 func (s stubProfiles) FindCardByID(_ context.Context, userID, viewerID uuid.UUID) (ports.ProfileCard, error) {
 	if userID != s.user.ID {
 		return ports.ProfileCard{}, contract.ErrNotFound

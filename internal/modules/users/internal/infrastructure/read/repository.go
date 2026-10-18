@@ -30,6 +30,14 @@ func (r *Repository) FindByTelegramID(ctx context.Context, telegramID int64) (do
 	return card.User, nil
 }
 
+func (r *Repository) FindByID(ctx context.Context, userID uuid.UUID) (domain.User, error) {
+	card, err := r.FindCardByID(ctx, userID, uuid.Nil)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return card.User, nil
+}
+
 func (r *Repository) FindCardByID(ctx context.Context, userID, viewerID uuid.UUID) (ports.ProfileCard, error) {
 	if r == nil || r.pool == nil || userID == uuid.Nil {
 		return ports.ProfileCard{}, contract.ErrNotFound

@@ -12,6 +12,7 @@ type UserRepository interface {
 	Upsert(ctx context.Context, user domain.User) error
 	EnsureSettings(ctx context.Context, telegramID int64, language string) error
 	NotificationsMuted(ctx context.Context, telegramID int64) (bool, error)
+	NotificationsMutedByUserID(ctx context.Context, userID uuid.UUID) (bool, error)
 	SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error
 	GetSettings(ctx context.Context, userID uuid.UUID) (domain.Settings, error)
 	UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, muted *bool) (domain.Settings, error)
@@ -27,6 +28,7 @@ type ProfileCard struct {
 
 type ProfileReader interface {
 	FindByTelegramID(ctx context.Context, telegramID int64) (domain.User, error)
+	FindByID(ctx context.Context, userID uuid.UUID) (domain.User, error)
 	FindCardByID(ctx context.Context, userID, viewerID uuid.UUID) (ProfileCard, error)
 	FindCardByTelegramID(ctx context.Context, telegramID int64, viewerID uuid.UUID) (ProfileCard, error)
 }

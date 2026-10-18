@@ -14,6 +14,11 @@ func Register(g *echo.Group, h *Handler, auth echo.MiddlewareFunc) {
 			}
 		}
 	}
-	g.GET("/notification-settings", h.Get, auth)
-	g.PATCH("/notification-settings", h.Patch, auth)
+	g.GET("/notification-settings", h.GetSettings, auth)
+	g.PATCH("/notification-settings", h.PatchSettings, auth)
+
+	g.GET("/notifications", h.List, auth)
+	g.GET("/notifications/unread", h.Unread, auth)
+	g.PATCH("/notifications/read", h.MarkAllRead, auth)
+	g.PATCH("/notifications/:id/read", h.MarkRead, auth)
 }

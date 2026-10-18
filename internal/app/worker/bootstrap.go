@@ -8,6 +8,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"review-api/internal/app/bot"
+	"review-api/internal/modules/notifications"
+	"review-api/internal/modules/reviews"
+	"review-api/internal/modules/users"
 	"review-api/internal/platform/config"
 	"review-api/internal/platform/database"
 	"review-api/internal/platform/eventbus"
@@ -37,7 +41,18 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
+	usersMod := users.New(users.Dependencies{Pool: pool})
+	reviewsMod := reviews.New(reviews.Dependencies{Pool: pool, Users: usersMod})
+	notifMod := notifications.New(notifications.Dependencies{
+		Pool:    pool,
+		Users:   usersMod,
+		Reviews: reviewsMod,
+		Bot:     bot.NewClient(cfg.App.TelegramBotToken),
+		Log:     log,
+	})
+
 	dispatcher := eventbus.NewDispatcher()
+	notifMod.RegisterConsumers(dispatcher)
 	bus := eventbus.Fanout{Pubs: []eventbus.Publisher{
 		eventbus.LoggingPublisher{Log: log},
 		dispatcher,

@@ -70,11 +70,34 @@ func (m *Module) UserID(ctx context.Context, telegramID int64) (uuid.UUID, error
 	return user.ID, nil
 }
 
+func (m *Module) UserRef(ctx context.Context, userID uuid.UUID) (contract.UserRef, error) {
+	if m == nil || m.profile == nil || userID == uuid.Nil {
+		return contract.UserRef{}, contract.ErrNotFound
+	}
+	card, err := m.profile.ByID(ctx, userID, uuid.Nil)
+	if err != nil {
+		return contract.UserRef{}, err
+	}
+	return contract.UserRef{
+		ID:         card.User.ID,
+		TelegramID: card.User.TelegramID,
+		Username:   card.User.Username,
+		FirstName:  card.User.FirstName,
+	}, nil
+}
+
 func (m *Module) NotificationsMuted(ctx context.Context, telegramID int64) (bool, error) {
 	if m == nil || m.prefs == nil {
 		return false, contract.ErrNotFound
 	}
 	return m.prefs.NotificationsMuted(ctx, telegramID)
+}
+
+func (m *Module) NotificationsMutedByUserID(ctx context.Context, userID uuid.UUID) (bool, error) {
+	if m == nil || m.prefs == nil {
+		return false, contract.ErrNotFound
+	}
+	return m.prefs.NotificationsMutedByUserID(ctx, userID)
 }
 
 func (m *Module) SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error {

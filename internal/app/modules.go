@@ -79,9 +79,10 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		Users: usersMod,
 	})
 	notificationsMod := notifications.New(notifications.Dependencies{
-		Pool:  pool,
-		Auth:  authMod.Middlewares.Bearer,
-		Users: usersMod,
+		Pool:    pool,
+		Auth:    authMod.Middlewares.Bearer,
+		Users:   usersMod,
+		Reviews: reviewsMod,
 	})
 	return Modules{
 		Auth: authMod, Users: usersMod, Reviews: reviewsMod,

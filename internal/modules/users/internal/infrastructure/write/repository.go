@@ -106,6 +106,22 @@ func (r *Repository) NotificationsMuted(ctx context.Context, telegramID int64) (
 	return muted, nil
 }
 
+func (r *Repository) NotificationsMutedByUserID(ctx context.Context, userID uuid.UUID) (bool, error) {
+	if r == nil || r.pool == nil || userID == uuid.Nil {
+		return false, contract.ErrNotFound
+	}
+	const query = `SELECT notifications_muted FROM user_settings WHERE user_id = $1`
+	var muted bool
+	err := r.queryRow(ctx, query, userID).Scan(&muted)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil // no settings row → treat as unmuted
+	}
+	if err != nil {
+		return false, fmt.Errorf("notifications muted by user: %w", err)
+	}
+	return muted, nil
+}
+
 func (r *Repository) SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error {
 	if r == nil || r.pool == nil || telegramID <= 0 {
 		return contract.ErrNotFound

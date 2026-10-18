@@ -40,6 +40,10 @@ func (f *fakeRepo) NotificationsMuted(_ context.Context, _ int64) (bool, error) 
 	return false, nil
 }
 
+func (f *fakeRepo) NotificationsMutedByUserID(_ context.Context, _ uuid.UUID) (bool, error) {
+	return false, nil
+}
+
 func (f *fakeRepo) SetNotificationsMuted(_ context.Context, _ int64, _ bool) error {
 	return nil
 }

@@ -39,6 +39,21 @@ func (f *fakePrefs) Patch(_ context.Context, _ uuid.UUID, like, follow *bool) er
 	return nil
 }
 
+func (f *fakePrefs) TypeEnabled(_ context.Context, _ uuid.UUID, name string) (bool, error) {
+	switch name {
+	case "like":
+		return f.like, nil
+	case "follow":
+		return f.follow, nil
+	default:
+		return false, nil
+	}
+}
+
+func (f *fakePrefs) TypeMeta(_ context.Context, name string) (ports.TypeMeta, error) {
+	return ports.TypeMeta{Name: name, Title: name, Text: name}, nil
+}
+
 func TestUpdatePrefsRejectsUnknownType(t *testing.T) {
 	t.Parallel()
 	h := NewUpdatePrefsHandler(&fakePrefs{like: true, follow: true})

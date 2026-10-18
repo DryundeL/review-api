@@ -23,19 +23,23 @@ type Dependencies struct {
 }
 
 type Module struct {
-	ensure  *command.EnsureUserHandler
-	profile *query.GetProfileHandler
-	prefs   ports.UserRepository
-	auth    echo.MiddlewareFunc
+	ensure         *command.EnsureUserHandler
+	profile        *query.GetProfileHandler
+	getSettings    *query.GetSettingsHandler
+	updateSettings *command.UpdateSettingsHandler
+	prefs          ports.UserRepository
+	auth           echo.MiddlewareFunc
 }
 
 func New(deps Dependencies) *Module {
 	writeRepo := write.NewRepository(deps.Pool)
 	return &Module{
-		ensure:  command.NewEnsureUserHandler(writeRepo, nil),
-		profile: query.NewGetProfileHandler(read.NewRepository(deps.Pool)),
-		prefs:   writeRepo,
-		auth:    deps.Auth,
+		ensure:         command.NewEnsureUserHandler(writeRepo, nil),
+		profile:        query.NewGetProfileHandler(read.NewRepository(deps.Pool)),
+		getSettings:    query.NewGetSettingsHandler(writeRepo),
+		updateSettings: command.NewUpdateSettingsHandler(writeRepo),
+		prefs:          writeRepo,
+		auth:           deps.Auth,
 	}
 }
 
@@ -85,5 +89,5 @@ func (m *Module) SetAuth(auth echo.MiddlewareFunc) {
 }
 
 func (m *Module) RegisterHTTP(g *echo.Group) {
-	usershttp.Register(g, usershttp.NewHandler(m.profile, m), m.auth)
+	usershttp.Register(g, usershttp.NewHandler(m.profile, m.getSettings, m.updateSettings, m), m.auth)
 }

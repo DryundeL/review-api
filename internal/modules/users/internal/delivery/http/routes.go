@@ -16,6 +16,8 @@ func Register(g *echo.Group, h *Handler, auth echo.MiddlewareFunc) {
 	}
 	g.GET("/profile", h.Profile, auth)
 	g.GET("/profiles/:id", h.PublicProfile, optionalAuth(auth))
+	g.GET("/settings", h.GetSettings, auth)
+	g.PATCH("/settings", h.PatchSettings, auth)
 }
 
 // optionalAuth runs Bearer only when Authorization is present.

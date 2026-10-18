@@ -71,13 +71,14 @@ func Bootstrap(ctx context.Context) (*App, error) {
 	})
 
 	routes.SetupAPIRoutes(router, routes.APIModules{
-		Auth:    modules.Auth,
-		Users:   modules.Users,
-		Reviews: modules.Reviews,
-		Catalog: modules.Catalog,
-		Social:  modules.Social,
-		Feed:    modules.Feed,
-		Search:  modules.Search,
+		Auth:          modules.Auth,
+		Users:         modules.Users,
+		Reviews:       modules.Reviews,
+		Catalog:       modules.Catalog,
+		Social:        modules.Social,
+		Feed:          modules.Feed,
+		Search:        modules.Search,
+		Notifications: modules.Notifications,
 	}, routes.APIOptions{
 		Redis:           rdb,
 		RateLimitPerMin: cfg.App.RateLimitPerMin,

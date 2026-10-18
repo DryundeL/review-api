@@ -30,5 +30,8 @@ func (h *EnsureUserHandler) Handle(ctx context.Context, profile contract.Telegra
 	if err := h.repo.Upsert(ctx, user); err != nil {
 		return fmt.Errorf("ensure user: %w", err)
 	}
+	if err := h.repo.EnsureSettings(ctx, user.TelegramID, domain.DefaultLanguage(user.LanguageCode)); err != nil {
+		return fmt.Errorf("ensure user settings: %w", err)
+	}
 	return nil
 }

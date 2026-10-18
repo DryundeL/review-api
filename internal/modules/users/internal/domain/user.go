@@ -123,6 +123,30 @@ func cleanLanguage(value string) string {
 	return value
 }
 
+// DefaultLanguage returns a settings language from Telegram language_code.
+func DefaultLanguage(telegramLang string) string {
+	if cleaned := cleanLanguage(telegramLang); cleaned != "" {
+		return cleaned
+	}
+	return "en"
+}
+
+// SettingsLanguage validates an explicit app-locale override.
+func SettingsLanguage(value string) (string, error) {
+	cleaned := cleanLanguage(value)
+	if cleaned == "" {
+		return "", contract.FieldError{Field: "language"}
+	}
+	return cleaned, nil
+}
+
+// Settings is the per-user app preference row (not the Telegram identity snapshot).
+type Settings struct {
+	UserID              uuid.UUID
+	Language            string
+	NotificationsMuted  bool
+}
+
 // cleanPhotoURL keeps only https Telegram profile links from signed initData.
 func cleanPhotoURL(value string) string {
 	value = strings.TrimSpace(value)

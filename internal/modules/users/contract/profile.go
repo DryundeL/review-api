@@ -7,7 +7,24 @@ import "errors"
 var (
 	ErrInvalidProfile = errors.New("invalid telegram profile")
 	ErrNotFound       = errors.New("user not found")
+	ErrInvalid        = errors.New("invalid")
 )
+
+// FieldError names the rejected field. The field is a fixed token, never raw input.
+type FieldError struct {
+	Field string
+}
+
+func (e FieldError) Error() string {
+	if e.Field == "" {
+		return ErrInvalid.Error()
+	}
+	return "invalid " + e.Field
+}
+
+func (e FieldError) Unwrap() error {
+	return ErrInvalid
+}
 
 // TelegramProfile is a full snapshot of a Telegram user object.
 // Empty optional strings clear the stored value on the next EnsureUser,

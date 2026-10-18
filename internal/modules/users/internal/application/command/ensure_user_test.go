@@ -6,13 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"review-api/internal/modules/users/contract"
 	"review-api/internal/modules/users/internal/domain"
 )
 
 type fakeRepo struct {
-	user domain.User
-	err  error
+	user     domain.User
+	settings bool
+	err      error
 }
 
 func (f *fakeRepo) Upsert(_ context.Context, user domain.User) error {
@@ -23,12 +26,30 @@ func (f *fakeRepo) Upsert(_ context.Context, user domain.User) error {
 	return nil
 }
 
+func (f *fakeRepo) EnsureSettings(_ context.Context, telegramID int64, _ string) error {
+	if f.err != nil {
+		return f.err
+	}
+	if telegramID == f.user.TelegramID {
+		f.settings = true
+	}
+	return nil
+}
+
 func (f *fakeRepo) NotificationsMuted(_ context.Context, _ int64) (bool, error) {
 	return false, nil
 }
 
 func (f *fakeRepo) SetNotificationsMuted(_ context.Context, _ int64, _ bool) error {
 	return nil
+}
+
+func (f *fakeRepo) GetSettings(_ context.Context, _ uuid.UUID) (domain.Settings, error) {
+	return domain.Settings{}, nil
+}
+
+func (f *fakeRepo) UpdateSettings(_ context.Context, _ uuid.UUID, _ *string, _ *bool) (domain.Settings, error) {
+	return domain.Settings{}, nil
 }
 
 func TestEnsureUserHandlerUpsertsProfile(t *testing.T) {
@@ -57,6 +78,9 @@ func TestEnsureUserHandlerUpsertsProfile(t *testing.T) {
 	}
 	if repo.user.PhotoURL != "https://t.me/i/userpic/320/ann.jpg" {
 		t.Fatalf("photo = %q", repo.user.PhotoURL)
+	}
+	if !repo.settings {
+		t.Fatal("expected settings ensure")
 	}
 }
 

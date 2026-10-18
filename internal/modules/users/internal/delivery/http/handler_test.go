@@ -63,7 +63,7 @@ func TestProfile(t *testing.T) {
 			PhotoURL: "https://t.me/i/userpic/320/ann.jpg",
 		},
 		followers: 3, following: 1,
-	}), stubUsers{id: uid})
+	}), nil, nil, stubUsers{id: uid})
 	e := echo.New()
 	e.HTTPErrorHandler = httpserver.ErrorHandler
 	e.GET("/v1/profile", h.Profile, func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -99,7 +99,7 @@ func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
 	h := NewHandler(query.NewGetProfileHandler(stubProfiles{
 		user:      domain.User{ID: target, TelegramID: 42, Username: "ann", FirstName: "Ann"},
 		followers: 2, isFollowing: true,
-	}), stubUsers{id: viewer})
+	}), nil, nil, stubUsers{id: viewer})
 	e := echo.New()
 	e.HTTPErrorHandler = httpserver.ErrorHandler
 	e.GET("/v1/profiles/:id", h.PublicProfile, func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -128,7 +128,7 @@ func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
 	h = NewHandler(query.NewGetProfileHandler(stubProfiles{
 		user:      domain.User{ID: viewer, TelegramID: 99, Username: "bob", FirstName: "Bob"},
 		followers: 0,
-	}), stubUsers{id: viewer})
+	}), nil, nil, stubUsers{id: viewer})
 	e = echo.New()
 	e.HTTPErrorHandler = httpserver.ErrorHandler
 	e.GET("/v1/profiles/:id", h.PublicProfile, func(next echo.HandlerFunc) echo.HandlerFunc {

@@ -142,9 +142,9 @@ func SettingsLanguage(value string) (string, error) {
 
 // Settings is the per-user app preference row (not the Telegram identity snapshot).
 type Settings struct {
-	UserID              uuid.UUID
-	Language            string
-	NotificationsMuted  bool
+	UserID             uuid.UUID
+	Language           string
+	NotificationsMuted bool
 }
 
 // cleanPhotoURL keeps only https Telegram profile links from signed initData.

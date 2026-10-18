@@ -12,11 +12,13 @@
    или GET /v1/profile                # только свой (Bearer обязателен)
 
 3. GET /v1/profiles/{userId}/reviews?limit=20
+4. GET /v1/profiles/{userId}/followers?limit=20&offset=0
+   GET /v1/profiles/{userId}/following?limit=20&offset=0
 
-4. PUT /v1/follows/{userId}           # подписаться (Bearer)
+5. PUT /v1/follows/{userId}           # подписаться (Bearer)
    DELETE /v1/follows/{userId}        # отписаться (Bearer)
 
-5. GET /v1/feed?mode=following        # лента подписок (Bearer)
+6. GET /v1/feed?mode=following        # лента подписок (Bearer)
 ```
 
 ---
@@ -74,55 +76,68 @@ Auth: **опционален**. Если есть Bearer и `{userId}` = я → 
 
 **404** — нет юзера / битый uuid.
 
-Список подписчиков/подписок на карточке нет — только счётчики. Списки: `GET /follows/followers|following` (свои).
+Список подписчиков/подписок на карточке нет — только счётчики. Списки: `GET /v1/profiles/{id}/followers|following`.
 
 ---
 
 ## Подписки
 
-Все эндпоинты ниже требуют `Authorization: Bearer <jwt>`.
+### Подписаться / отписаться
 
-### Подписаться
+Auth: **Bearer обязателен**.
 
 ```http
 PUT /v1/follows/{userId}
-```
-
-| Код | Когда |
-|---|---|
-| `204` | ок |
-| `401` | нет/битый JWT |
-| `409` | уже подписан |
-| `422` | сам на себя / битый uuid / юзера нет |
-
-После успеха на UI: `isFollowing = true`, `followersCount++`.
-
-### Отписаться
-
-```http
 DELETE /v1/follows/{userId}
 ```
 
 | Код | Когда |
 |---|---|
 | `204` | ок |
-| `404` | подписки не было |
-| `401` | нет JWT |
+| `401` | нет/битый JWT |
+| `409` | уже подписан (PUT) |
+| `404` | подписки не было (DELETE) |
+| `422` | сам на себя / битый uuid / юзера нет |
 
-### Списки (свои)
+После успешного PUT на UI: `isFollowing = true`, `followersCount++`.
+
+### Списки подписок / подписчиков
+
+Как и reviews — вложены в профиль (не `/users`: в API ресурс называется `profiles`).
 
 ```http
-GET /v1/follows/following?limit=20
-GET /v1/follows/followers?limit=20
+GET /v1/profiles/{id}/followers?limit=20&offset=0
+GET /v1/profiles/{id}/following?limit=20&offset=0
 ```
+
+| Параметр | Default | Заметки |
+|---|---|---|
+| `limit` | `20` | `1`–`50` |
+| `offset` | `0` | `≥ 0`, макс. `10000` |
+
+Auth: **опционален**. С Bearer заполняется `isFollowing` (подписан ли **текущий** юзер на человека в строке). Без auth / на себя в списке → `false`.
+
+Свой список: `id` из `GET /v1/profile`.
 
 ```json
 {
   "items": [
-    { "userId": "uuid", "createdAt": "2026-10-17T12:00:00Z" }
+    {
+      "userId": "uuid",
+      "username": "ann",
+      "photoUrl": "https://t.me/i/userpic/320/....jpg",
+      "isFollowing": true,
+      "createdAt": "2026-10-17T12:00:00Z"
+    }
   ]
 }
 ```
+
+| Код | Когда |
+|---|---|
+| `200` | ок |
+| `404` | профиля нет |
+| `422` | битый `id` / `limit` / `offset` |
 
 ### Лента подписок
 

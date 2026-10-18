@@ -15,14 +15,24 @@ type Follow struct {
 	CreatedAt  time.Time
 }
 
+// FollowUser is a list row with profile fields for followers/following screens.
+type FollowUser struct {
+	UserID      uuid.UUID
+	Username    string
+	PhotoURL    string
+	IsFollowing bool
+	CreatedAt   time.Time
+}
+
 type Writer interface {
 	Create(ctx context.Context, item domain.Follow) error
 	Delete(ctx context.Context, followerID, followeeID uuid.UUID) error
 }
 
 type Reader interface {
-	ListFollowing(ctx context.Context, followerID uuid.UUID, limit int) ([]Follow, error)
-	ListFollowers(ctx context.Context, followeeID uuid.UUID, limit int) ([]Follow, error)
+	UserExists(ctx context.Context, userID uuid.UUID) (bool, error)
+	ListFollowing(ctx context.Context, subjectID, viewerID uuid.UUID, limit, offset int) ([]FollowUser, error)
+	ListFollowers(ctx context.Context, subjectID, viewerID uuid.UUID, limit, offset int) ([]FollowUser, error)
 }
 
 type Publisher interface {

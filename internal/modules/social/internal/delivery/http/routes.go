@@ -14,8 +14,21 @@ func Register(g *echo.Group, h *Handler, auth echo.MiddlewareFunc) {
 			}
 		}
 	}
-	g.GET("/follows/following", h.ListFollowing, auth)
-	g.GET("/follows/followers", h.ListFollowers, auth)
+	opt := optionalAuth(auth)
+	// Nested under profiles — same resource as GET /profiles/:id (not /users).
+	g.GET("/profiles/:id/following", h.ListFollowing, opt)
+	g.GET("/profiles/:id/followers", h.ListFollowers, opt)
 	g.PUT("/follows/:userId", h.Follow, auth)
 	g.DELETE("/follows/:userId", h.Unfollow, auth)
+}
+
+func optionalAuth(auth echo.MiddlewareFunc) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if c.Request().Header.Get(echo.HeaderAuthorization) == "" {
+				return next(c)
+			}
+			return auth(next)(c)
+		}
+	}
 }

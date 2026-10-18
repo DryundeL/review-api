@@ -45,7 +45,7 @@ func NewHandler(
 }
 
 func (h *Handler) Follow(c echo.Context) error {
-	followerID, err := h.resolveUser(c)
+	followerID, err := h.requireUser(c)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (h *Handler) Follow(c echo.Context) error {
 }
 
 func (h *Handler) Unfollow(c echo.Context) error {
-	followerID, err := h.resolveUser(c)
+	followerID, err := h.requireUser(c)
 	if err != nil {
 		return err
 	}
@@ -77,30 +77,39 @@ func (h *Handler) Unfollow(c echo.Context) error {
 }
 
 func (h *Handler) ListFollowing(c echo.Context) error {
-	userID, err := h.resolveUser(c)
-	if err != nil {
-		return err
-	}
-	items, err := h.listFollowing.Handle(c.Request().Context(), userID, parseLimit(c))
-	if err != nil {
-		return mapError(err)
-	}
-	return c.JSON(http.StatusOK, listResponse{Items: followItems(items, true)})
+	return h.list(c, true)
 }
 
 func (h *Handler) ListFollowers(c echo.Context) error {
-	userID, err := h.resolveUser(c)
+	return h.list(c, false)
+}
+
+func (h *Handler) list(c echo.Context, following bool) error {
+	subjectID, err := uuid.Parse(c.Param("id"))
+	if err != nil || subjectID == uuid.Nil {
+		return mapError(contract.FieldError{Field: "id"})
+	}
+	viewerID, err := h.optionalUser(c)
 	if err != nil {
 		return err
 	}
-	items, err := h.listFollowers.Handle(c.Request().Context(), userID, parseLimit(c))
+	limit, offset, err := parsePage(c)
 	if err != nil {
 		return mapError(err)
 	}
-	return c.JSON(http.StatusOK, listResponse{Items: followItems(items, false)})
+	var items []ports.FollowUser
+	if following {
+		items, err = h.listFollowing.Handle(c.Request().Context(), subjectID, viewerID, limit, offset)
+	} else {
+		items, err = h.listFollowers.Handle(c.Request().Context(), subjectID, viewerID, limit, offset)
+	}
+	if err != nil {
+		return mapError(err)
+	}
+	return c.JSON(http.StatusOK, listResponse{Items: followItems(items)})
 }
 
-func (h *Handler) resolveUser(c echo.Context) (uuid.UUID, error) {
+func (h *Handler) requireUser(c echo.Context) (uuid.UUID, error) {
 	id, err := authcontract.IdentityFromContext(c.Request().Context())
 	if err != nil {
 		return uuid.Nil, httperr.Unauthorized("unauthorized")
@@ -112,35 +121,62 @@ func (h *Handler) resolveUser(c echo.Context) (uuid.UUID, error) {
 	return userID, nil
 }
 
-func parseLimit(c echo.Context) int {
-	raw := c.QueryParam("limit")
-	if raw == "" {
-		return 20
-	}
-	n, err := strconv.Atoi(raw)
+func (h *Handler) optionalUser(c echo.Context) (uuid.UUID, error) {
+	id, err := authcontract.IdentityFromContext(c.Request().Context())
 	if err != nil {
-		return 20
+		return uuid.Nil, nil
 	}
-	return n
+	if h.users == nil {
+		return uuid.Nil, nil
+	}
+	userID, err := h.users.UserID(c.Request().Context(), id.TelegramID)
+	if err != nil {
+		return uuid.Nil, httperr.Unauthorized("unauthorized")
+	}
+	return userID, nil
+}
+
+func parsePage(c echo.Context) (limit, offset int, err error) {
+	limit = 20
+	if raw := c.QueryParam("limit"); raw != "" {
+		n, e := strconv.Atoi(raw)
+		if e != nil || n < 1 {
+			return 0, 0, contract.FieldError{Field: "limit"}
+		}
+		limit = n
+	}
+	if raw := c.QueryParam("offset"); raw != "" {
+		n, e := strconv.Atoi(raw)
+		if e != nil || n < 0 {
+			return 0, 0, contract.FieldError{Field: "offset"}
+		}
+		offset = n
+	}
+	return limit, offset, nil
 }
 
 type followJSON struct {
-	UserID    string    `json:"userId"`
-	CreatedAt time.Time `json:"createdAt"`
+	UserID      string    `json:"userId"`
+	Username    string    `json:"username"`
+	PhotoURL    string    `json:"photoUrl,omitempty"`
+	IsFollowing bool      `json:"isFollowing"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 type listResponse struct {
 	Items []followJSON `json:"items"`
 }
 
-func followItems(items []ports.Follow, following bool) []followJSON {
+func followItems(items []ports.FollowUser) []followJSON {
 	out := make([]followJSON, 0, len(items))
 	for _, item := range items {
-		uid := item.FolloweeID
-		if !following {
-			uid = item.FollowerID
-		}
-		out = append(out, followJSON{UserID: uid.String(), CreatedAt: item.CreatedAt})
+		out = append(out, followJSON{
+			UserID:      item.UserID.String(),
+			Username:    item.Username,
+			PhotoURL:    item.PhotoURL,
+			IsFollowing: item.IsFollowing,
+			CreatedAt:   item.CreatedAt,
+		})
 	}
 	return out
 }
@@ -156,7 +192,7 @@ func mapError(err error) error {
 			Details: map[string]string{"field": field.Field},
 		}
 	case errors.Is(err, contract.ErrNotFound):
-		return httperr.New(http.StatusNotFound, "NOT_FOUND", "follow not found")
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "not found")
 	case errors.Is(err, contract.ErrConflict):
 		return httperr.New(http.StatusConflict, "CONFLICT", "already following")
 	case errors.Is(err, contract.ErrForbidden):

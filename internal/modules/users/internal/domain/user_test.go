@@ -22,6 +22,7 @@ func TestNewUserStoresProfileFields(t *testing.T) {
 		Username:     "@Anna_1",
 		LanguageCode: "ru",
 		IsPremium:    true,
+		PhotoURL:     " https://t.me/i/userpic/320/abc.jpg ",
 	}, now)
 	if err != nil {
 		t.Fatalf("new user: %v", err)
@@ -31,6 +32,9 @@ func TestNewUserStoresProfileFields(t *testing.T) {
 	}
 	if user.Username != "Anna_1" || user.LanguageCode != "ru" || !user.IsPremium {
 		t.Fatalf("profile = %+v", user)
+	}
+	if user.PhotoURL != "https://t.me/i/userpic/320/abc.jpg" {
+		t.Fatalf("photo = %q", user.PhotoURL)
 	}
 	if user.ID == uuid.Nil || !user.CreatedAt.Equal(now) || !user.UpdatedAt.Equal(now) {
 		t.Fatalf("identity timestamps = %+v", user)
@@ -59,6 +63,7 @@ func TestNewUserDropsUnsafeOptionalFields(t *testing.T) {
 		LastName:     "Bad name\n",
 		Username:     "not a user",
 		LanguageCode: "ru;drop",
+		PhotoURL:     "http://evil.example/x",
 	}, time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("new user: %v", err)
@@ -66,7 +71,7 @@ func TestNewUserDropsUnsafeOptionalFields(t *testing.T) {
 	if strings.Contains(user.FirstName, "\u202e") || utf8.RuneCountInString(user.FirstName) > 64 {
 		t.Fatalf("first name = %q", user.FirstName)
 	}
-	if user.LastName != "Bad name" || user.Username != "" || user.LanguageCode != "" {
+	if user.LastName != "Bad name" || user.Username != "" || user.LanguageCode != "" || user.PhotoURL != "" {
 		t.Fatalf("optional = %+v", user)
 	}
 }

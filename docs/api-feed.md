@@ -34,6 +34,7 @@
       "author": {
         "id": "uuid",
         "username": "ann",
+        "photoUrl": "https://t.me/i/userpic/320/....jpg",
         "isFollowing": true
       },
       "mediaObject": {
@@ -58,6 +59,7 @@
 - `author.isFollowing` — подписан ли текущий юзер на автора. Без auth → всегда `false`. На свои посты → `false`.
 - `nextCursor`: `string` или `null`. Если `null` — конец ленты.
 - `author.username` — ник Telegram **без** `@`. Может быть `""`.
+- `author.photoUrl` — аватар Telegram CDN; может отсутствовать.
 - `author.id` === `authorId` — `GET /v1/profiles/{id}`, подписка. См. [api-social.md](api-social.md).
 
 ### Скролл / подгрузка

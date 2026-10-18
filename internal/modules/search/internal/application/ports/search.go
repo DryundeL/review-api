@@ -26,6 +26,7 @@ type AuthorTrend struct {
 	ID             uuid.UUID
 	Username       string
 	FirstName      string
+	PhotoURL       string
 	FollowersCount int64
 	IsFollowing    bool
 }
@@ -42,6 +43,7 @@ type UserHit struct {
 	ID             uuid.UUID
 	Username       string
 	FirstName      string
+	PhotoURL       string
 	FollowersCount int64
 	IsFollowing    bool
 }
@@ -52,6 +54,7 @@ type ReviewHit struct {
 	Title       string
 	AuthorID    uuid.UUID
 	Username    string
+	PhotoURL    string
 	MediaObject MediaRef
 	Rating      int16
 	LikesCount  int64

@@ -47,7 +47,7 @@ func (r *Repository) List(ctx context.Context, p ports.ListParams) ([]ports.Item
 	viewerArg := arg(p.ViewerID)
 
 	b.WriteString(`
-		SELECT r.id, r.author_id, COALESCE(u.username, ''),
+		SELECT r.id, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 			( `)
 	b.WriteString(viewerArg)
 	b.WriteString(` <> '00000000-0000-0000-0000-000000000000'::uuid
@@ -154,7 +154,7 @@ func scanItem(row interface {
 	var item ports.Item
 	var poster *string
 	err := row.Scan(
-		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.IsFollowing,
+		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.PhotoURL, &item.Author.IsFollowing,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating,
 		&item.HasSpoilers,

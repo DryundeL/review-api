@@ -44,6 +44,7 @@ func TestEnsureUserHandlerUpsertsProfile(t *testing.T) {
 		Username:     "ann",
 		LanguageCode: "en",
 		IsPremium:    true,
+		PhotoURL:     "https://t.me/i/userpic/320/ann.jpg",
 	})
 	if err != nil {
 		t.Fatalf("handle: %v", err)
@@ -53,6 +54,9 @@ func TestEnsureUserHandlerUpsertsProfile(t *testing.T) {
 	}
 	if !repo.user.IsPremium || repo.user.LanguageCode != "en" || !repo.user.UpdatedAt.Equal(now) {
 		t.Fatalf("stored = %+v", repo.user)
+	}
+	if repo.user.PhotoURL != "https://t.me/i/userpic/320/ann.jpg" {
+		t.Fatalf("photo = %q", repo.user.PhotoURL)
 	}
 }
 

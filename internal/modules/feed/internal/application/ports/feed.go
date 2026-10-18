@@ -28,6 +28,7 @@ type MediaObjectRef struct {
 type AuthorRef struct {
 	ID          uuid.UUID
 	Username    string
+	PhotoURL    string
 	IsFollowing bool
 }
 

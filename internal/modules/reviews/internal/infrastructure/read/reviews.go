@@ -40,7 +40,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (por
 		return ports.Review{}, contract.ErrNotFound
 	}
 	const query = `
-		SELECT r.id, r.author_id, COALESCE(u.username, ''),
+		SELECT r.id, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 			($2 <> '00000000-0000-0000-0000-000000000000'::uuid
 				AND EXISTS (
 					SELECT 1 FROM follows f
@@ -165,7 +165,7 @@ func scanReview(row pgx.Row) (ports.Review, error) {
 	var item ports.Review
 	var poster *string
 	err := row.Scan(
-		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.IsFollowing,
+		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.PhotoURL, &item.Author.IsFollowing,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating, &item.Status,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,

@@ -25,9 +25,9 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 func (r *Repository) Upsert(ctx context.Context, user domain.User) error {
 	const query = `
 		INSERT INTO users (
-			id, telegram_id, username, first_name, last_name, language_code, is_premium, created_at, updated_at
+			id, telegram_id, username, first_name, last_name, language_code, is_premium, photo_url, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $8
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $9
 		)
 		ON CONFLICT (telegram_id) DO UPDATE SET
 			username = EXCLUDED.username,
@@ -35,6 +35,7 @@ func (r *Repository) Upsert(ctx context.Context, user domain.User) error {
 			last_name = EXCLUDED.last_name,
 			language_code = EXCLUDED.language_code,
 			is_premium = EXCLUDED.is_premium,
+			photo_url = COALESCE(EXCLUDED.photo_url, users.photo_url),
 			updated_at = EXCLUDED.updated_at
 	`
 	err := r.exec(ctx, query,
@@ -45,6 +46,7 @@ func (r *Repository) Upsert(ctx context.Context, user domain.User) error {
 		nullString(user.LastName),
 		nullString(user.LanguageCode),
 		user.IsPremium,
+		nullString(user.PhotoURL),
 		user.UpdatedAt.UTC(),
 	)
 	if err != nil {

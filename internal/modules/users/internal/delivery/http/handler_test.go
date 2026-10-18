@@ -58,7 +58,10 @@ func TestProfile(t *testing.T) {
 	t.Parallel()
 	uid := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	h := NewHandler(query.NewGetProfileHandler(stubProfiles{
-		user:      domain.User{ID: uid, TelegramID: 42, Username: "ann", FirstName: "Ann"},
+		user: domain.User{
+			ID: uid, TelegramID: 42, Username: "ann", FirstName: "Ann",
+			PhotoURL: "https://t.me/i/userpic/320/ann.jpg",
+		},
 		followers: 3, following: 1,
 	}), stubUsers{id: uid})
 	e := echo.New()
@@ -83,6 +86,9 @@ func TestProfile(t *testing.T) {
 	}
 	if !body.IsMe || body.FollowersCount != 3 || body.FollowingCount != 1 || body.TelegramID == nil || *body.TelegramID != 42 {
 		t.Fatalf("body = %+v", body)
+	}
+	if body.PhotoURL != "https://t.me/i/userpic/320/ann.jpg" {
+		t.Fatalf("photoUrl = %q", body.PhotoURL)
 	}
 }
 

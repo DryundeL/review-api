@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"net/url"
 	"strings"
 	"time"
 	"unicode"
@@ -15,6 +16,7 @@ const (
 	maxNameLen     = 64
 	maxUsernameLen = 32
 	maxLangLen     = 16
+	maxPhotoURLLen = 2048
 )
 
 // User is the stored profile. Optional strings are empty when the column is NULL.
@@ -26,6 +28,7 @@ type User struct {
 	LastName     string
 	LanguageCode string
 	IsPremium    bool
+	PhotoURL     string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -54,6 +57,7 @@ func NewUser(p contract.TelegramProfile, now time.Time) (User, error) {
 		LastName:     last,
 		LanguageCode: cleanLanguage(p.LanguageCode),
 		IsPremium:    p.IsPremium,
+		PhotoURL:     cleanPhotoURL(p.PhotoURL),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}, nil
@@ -117,4 +121,21 @@ func cleanLanguage(value string) string {
 		}
 	}
 	return value
+}
+
+// cleanPhotoURL keeps only https Telegram profile links from signed initData.
+func cleanPhotoURL(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > maxPhotoURLLen {
+		return ""
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+		return ""
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return ""
+	}
+	return parsed.String()
 }

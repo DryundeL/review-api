@@ -10,7 +10,9 @@ var (
 )
 
 // TelegramProfile is a full snapshot of a Telegram user object.
-// Empty optional strings clear the stored value on the next EnsureUser.
+// Empty optional strings clear the stored value on the next EnsureUser,
+// except PhotoURL: empty keeps the previously stored Telegram CDN link
+// (bot updates never carry photo_url).
 type TelegramProfile struct {
 	TelegramID   int64
 	IsBot        bool
@@ -19,4 +21,5 @@ type TelegramProfile struct {
 	Username     string
 	LanguageCode string
 	IsPremium    bool
+	PhotoURL     string
 }

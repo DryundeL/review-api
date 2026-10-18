@@ -54,6 +54,7 @@ func (m *Module) EnsureIdentity(ctx context.Context, id authcontract.TelegramIde
 		Username:     id.Username,
 		LanguageCode: id.LanguageCode,
 		IsPremium:    id.IsPremium,
+		PhotoURL:     id.PhotoURL,
 	})
 }
 

@@ -64,6 +64,7 @@ func (r *Repository) TopAuthors(ctx context.Context, viewerID uuid.UUID, limit i
 		SELECT u.id,
 			COALESCE(u.username, ''),
 			u.first_name,
+			COALESCE(u.photo_url, ''),
 			COUNT(f.follower_id)::bigint AS followers_count,
 			(
 				$1::uuid <> '00000000-0000-0000-0000-000000000000'::uuid
@@ -88,7 +89,7 @@ func (r *Repository) TopAuthors(ctx context.Context, viewerID uuid.UUID, limit i
 	for rows.Next() {
 		var item ports.AuthorTrend
 		if err := rows.Scan(
-			&item.ID, &item.Username, &item.FirstName, &item.FollowersCount, &item.IsFollowing,
+			&item.ID, &item.Username, &item.FirstName, &item.PhotoURL, &item.FollowersCount, &item.IsFollowing,
 		); err != nil {
 			return nil, fmt.Errorf("scan top author: %w", err)
 		}
@@ -136,6 +137,7 @@ func (r *Repository) SearchUsers(ctx context.Context, q string, viewerID uuid.UU
 		SELECT u.id,
 			COALESCE(u.username, ''),
 			u.first_name,
+			COALESCE(u.photo_url, ''),
 			(SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.id),
 			(
 				$3::uuid <> '00000000-0000-0000-0000-000000000000'::uuid
@@ -161,7 +163,7 @@ func (r *Repository) SearchUsers(ctx context.Context, q string, viewerID uuid.UU
 	for rows.Next() {
 		var item ports.UserHit
 		if err := rows.Scan(
-			&item.ID, &item.Username, &item.FirstName, &item.FollowersCount, &item.IsFollowing,
+			&item.ID, &item.Username, &item.FirstName, &item.PhotoURL, &item.FollowersCount, &item.IsFollowing,
 		); err != nil {
 			return nil, fmt.Errorf("scan user hit: %w", err)
 		}
@@ -176,7 +178,7 @@ func (r *Repository) SearchReviews(ctx context.Context, q string, limit int) ([]
 	}
 	like := escapeLike(q)
 	const sql = `
-		SELECT r.id, r.title, r.author_id, COALESCE(u.username, ''),
+		SELECT r.id, r.title, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 			mo.id, mo.title, mo.type, mo.poster_url,
 			r.rating, r.likes_count, r.views_count
 		FROM reviews r
@@ -198,7 +200,7 @@ func (r *Repository) SearchReviews(ctx context.Context, q string, limit int) ([]
 		var item ports.ReviewHit
 		var poster *string
 		if err := rows.Scan(
-			&item.ID, &item.Title, &item.AuthorID, &item.Username,
+			&item.ID, &item.Title, &item.AuthorID, &item.Username, &item.PhotoURL,
 			&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 			&item.Rating, &item.LikesCount, &item.ViewsCount,
 		); err != nil {

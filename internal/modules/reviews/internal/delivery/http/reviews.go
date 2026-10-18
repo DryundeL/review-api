@@ -50,6 +50,7 @@ type reviewJSON struct {
 type authorJSON struct {
 	ID          string `json:"id"`
 	Username    string `json:"username"`
+	PhotoURL    string `json:"photoUrl,omitempty"`
 	IsFollowing bool   `json:"isFollowing"`
 }
 
@@ -321,6 +322,7 @@ func authorResponse(a ports.AuthorRef) *authorJSON {
 	return &authorJSON{
 		ID:          a.ID.String(),
 		Username:    a.Username,
+		PhotoURL:    a.PhotoURL,
 		IsFollowing: a.IsFollowing,
 	}
 }

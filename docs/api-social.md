@@ -33,6 +33,7 @@ Auth: **Bearer обязателен**.
   "username": "ann",
   "firstName": "Ann",
   "lastName": "Lee",
+  "photoUrl": "https://t.me/i/userpic/320/....jpg",
   "followersCount": 12,
   "followingCount": 5,
   "isFollowing": false,
@@ -55,6 +56,7 @@ Auth: **опционален**. Если есть Bearer и `{userId}` = я → 
   "username": "ann",
   "firstName": "Ann",
   "lastName": "Lee",
+  "photoUrl": "https://t.me/i/userpic/320/....jpg",
   "followersCount": 12,
   "followingCount": 5,
   "isFollowing": true,
@@ -64,6 +66,7 @@ Auth: **опционален**. Если есть Bearer и `{userId}` = я → 
 
 | Поле | Смысл |
 |---|---|
+| `photoUrl` | ссылка на аватар в Telegram CDN (из initData); может отсутствовать |
 | `followersCount` | сколько подписчиков |
 | `followingCount` | на скольких подписан |
 | `isFollowing` | подписан ли **текущий** юзер на этого (без auth / на себя → `false`) |

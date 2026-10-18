@@ -42,6 +42,7 @@ type authorTrendJSON struct {
 	ID             string `json:"id"`
 	Username       string `json:"username"`
 	FirstName      string `json:"firstName"`
+	PhotoURL       string `json:"photoUrl,omitempty"`
 	FollowersCount int64  `json:"followersCount"`
 	IsFollowing    bool   `json:"isFollowing"`
 }
@@ -56,6 +57,7 @@ type userHitJSON struct {
 	ID             string `json:"id"`
 	Username       string `json:"username"`
 	FirstName      string `json:"firstName"`
+	PhotoURL       string `json:"photoUrl,omitempty"`
 	FollowersCount int64  `json:"followersCount"`
 	IsFollowing    bool   `json:"isFollowing"`
 }
@@ -72,6 +74,7 @@ type reviewHitJSON struct {
 	Title       string       `json:"title"`
 	AuthorID    string       `json:"authorId"`
 	Username    string       `json:"username"`
+	PhotoURL    string       `json:"photoUrl,omitempty"`
 	MediaObject mediaRefJSON `json:"mediaObject"`
 	Rating      int16        `json:"rating"`
 	LikesCount  int64        `json:"likesCount"`
@@ -105,7 +108,7 @@ func (h *Handler) Trends(c echo.Context) error {
 		for _, a := range result.Authors {
 			items = append(items, authorTrendJSON{
 				ID: a.ID.String(), Username: a.Username, FirstName: a.FirstName,
-				FollowersCount: a.FollowersCount, IsFollowing: a.IsFollowing,
+				PhotoURL: a.PhotoURL, FollowersCount: a.FollowersCount, IsFollowing: a.IsFollowing,
 			})
 		}
 		return c.JSON(http.StatusOK, map[string]any{"tab": result.Tab, "items": items})
@@ -145,13 +148,14 @@ func (h *Handler) Search(c echo.Context) error {
 	for _, u := range result.Users {
 		users = append(users, userHitJSON{
 			ID: u.ID.String(), Username: u.Username, FirstName: u.FirstName,
-			FollowersCount: u.FollowersCount, IsFollowing: u.IsFollowing,
+			PhotoURL: u.PhotoURL, FollowersCount: u.FollowersCount, IsFollowing: u.IsFollowing,
 		})
 	}
 	reviews := make([]reviewHitJSON, 0, len(result.Reviews))
 	for _, r := range result.Reviews {
 		reviews = append(reviews, reviewHitJSON{
 			ID: r.ID.String(), Title: r.Title, AuthorID: r.AuthorID.String(), Username: r.Username,
+			PhotoURL: r.PhotoURL,
 			MediaObject: mediaRefJSON{
 				ID: r.MediaObject.ID.String(), Title: r.MediaObject.Title,
 				Type: r.MediaObject.Type, PosterURL: r.MediaObject.PosterURL,

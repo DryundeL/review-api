@@ -85,6 +85,7 @@ type profileResponse struct {
 	Username       string `json:"username"`
 	FirstName      string `json:"firstName"`
 	LastName       string `json:"lastName"`
+	PhotoURL       string `json:"photoUrl,omitempty"`
 	FollowersCount int64  `json:"followersCount"`
 	FollowingCount int64  `json:"followingCount"`
 	IsFollowing    bool   `json:"isFollowing"`
@@ -100,6 +101,7 @@ func profileJSON(card query.Card, includePrivate bool) profileResponse {
 		Username:       card.User.Username,
 		FirstName:      card.User.FirstName,
 		LastName:       card.User.LastName,
+		PhotoURL:       card.User.PhotoURL,
 		FollowersCount: card.FollowersCount,
 		FollowingCount: card.FollowingCount,
 		IsFollowing:    card.IsFollowing,

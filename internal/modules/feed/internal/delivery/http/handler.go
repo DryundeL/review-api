@@ -45,6 +45,7 @@ type feedItemJSON struct {
 type authorJSON struct {
 	ID          string `json:"id"`
 	Username    string `json:"username"`
+	PhotoURL    string `json:"photoUrl,omitempty"`
 	IsFollowing bool   `json:"isFollowing"`
 }
 
@@ -125,6 +126,7 @@ func itemJSON(item ports.Item) feedItemJSON {
 		Author: authorJSON{
 			ID:          item.Author.ID.String(),
 			Username:    item.Author.Username,
+			PhotoURL:    item.Author.PhotoURL,
 			IsFollowing: item.Author.IsFollowing,
 		},
 		MediaObject:   mediaJSON(item.MediaObject),

@@ -66,6 +66,7 @@ Auth **опционален**. С Bearer заполняется `isFollowing` у
       "id": "uuid",
       "username": "ann",
       "firstName": "Ann",
+      "photoUrl": "https://t.me/i/userpic/320/....jpg",
       "followersCount": 120,
       "isFollowing": false
     }
@@ -136,6 +137,7 @@ GET /v1/search/trends?tab=types
       "id": "uuid",
       "username": "ann",
       "firstName": "Ann",
+      "photoUrl": "https://t.me/i/userpic/320/....jpg",
       "followersCount": 12,
       "isFollowing": true
     }
@@ -146,6 +148,7 @@ GET /v1/search/trends?tab=types
       "title": "Почему это шедевр",
       "authorId": "uuid",
       "username": "ann",
+      "photoUrl": "https://t.me/i/userpic/320/....jpg",
       "mediaObject": {
         "id": "uuid",
         "title": "Title",

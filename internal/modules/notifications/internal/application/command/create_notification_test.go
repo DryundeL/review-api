@@ -15,7 +15,7 @@ type createFake struct {
 	likeEnabled bool
 	inserted    bool
 	botCalls    int
-	muted       bool
+	allow       bool
 }
 
 func (f *createFake) EnsureDefaults(context.Context, uuid.UUID) error { return nil }
@@ -46,8 +46,8 @@ func (f *createFake) MarkAllRead(context.Context, uuid.UUID) error          { re
 func (f *createFake) UserRef(_ context.Context, id uuid.UUID) (userscontract.UserRef, error) {
 	return userscontract.UserRef{ID: id, TelegramID: 99, Username: "ann", FirstName: "Ann"}, nil
 }
-func (f *createFake) NotificationsMutedByUserID(context.Context, uuid.UUID) (bool, error) {
-	return f.muted, nil
+func (f *createFake) AllowNotificationsByUserID(context.Context, uuid.UUID) (bool, error) {
+	return f.allow, nil
 }
 func (f *createFake) SendMessage(context.Context, int64, string, any) error {
 	f.botCalls++
@@ -68,7 +68,7 @@ func TestCreateSkipsDisabledType(t *testing.T) {
 
 func TestCreateWritesInboxAndBot(t *testing.T) {
 	t.Parallel()
-	f := &createFake{likeEnabled: true}
+	f := &createFake{likeEnabled: true, allow: true}
 	h := NewCreateNotificationHandler(f, f, f, f, f, slog.Default())
 	err := h.Handle(context.Background(), CreateInput{
 		RecipientID: uuid.New(), ActorID: uuid.New(), TypeName: "like", ReviewTitle: "X",
@@ -78,9 +78,9 @@ func TestCreateWritesInboxAndBot(t *testing.T) {
 	}
 }
 
-func TestCreateMuteSkipsBot(t *testing.T) {
+func TestCreateDisallowSkipsBot(t *testing.T) {
 	t.Parallel()
-	f := &createFake{likeEnabled: true, muted: true}
+	f := &createFake{likeEnabled: true, allow: false}
 	h := NewCreateNotificationHandler(f, f, f, f, f, slog.Default())
 	_ = h.Handle(context.Background(), CreateInput{
 		RecipientID: uuid.New(), ActorID: uuid.New(), TypeName: "like",

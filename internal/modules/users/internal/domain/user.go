@@ -144,7 +144,7 @@ func SettingsLanguage(value string) (string, error) {
 type Settings struct {
 	UserID             uuid.UUID
 	Language           string
-	NotificationsMuted bool
+	AllowNotifications bool
 }
 
 // cleanPhotoURL keeps only https Telegram profile links from signed initData.

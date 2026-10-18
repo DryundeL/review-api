@@ -21,14 +21,14 @@ func NewUpdateSettingsHandler(repo ports.UserRepository) *UpdateSettingsHandler 
 
 type UpdateSettingsInput struct {
 	Language           *string
-	NotificationsMuted *bool
+	AllowNotifications *bool
 }
 
 func (h *UpdateSettingsHandler) Handle(ctx context.Context, userID uuid.UUID, in UpdateSettingsInput) (domain.Settings, error) {
 	if userID == uuid.Nil {
 		return domain.Settings{}, contract.ErrNotFound
 	}
-	if in.Language == nil && in.NotificationsMuted == nil {
+	if in.Language == nil && in.AllowNotifications == nil {
 		s, err := h.repo.GetSettings(ctx, userID)
 		if err != nil {
 			return domain.Settings{}, err
@@ -43,7 +43,7 @@ func (h *UpdateSettingsHandler) Handle(ctx context.Context, userID uuid.UUID, in
 		}
 		language = &cleaned
 	}
-	s, err := h.repo.UpdateSettings(ctx, userID, language, in.NotificationsMuted)
+	s, err := h.repo.UpdateSettings(ctx, userID, language, in.AllowNotifications)
 	if err != nil {
 		return domain.Settings{}, fmt.Errorf("update settings: %w", err)
 	}

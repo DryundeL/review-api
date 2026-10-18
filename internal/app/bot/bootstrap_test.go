@@ -18,7 +18,7 @@ type fakeUsers struct {
 	profile contract.TelegramProfile
 	err     error
 	calls   int
-	muted   bool
+	allow   bool
 }
 
 func (f *fakeUsers) EnsureUser(_ context.Context, profile contract.TelegramProfile) error {
@@ -27,12 +27,12 @@ func (f *fakeUsers) EnsureUser(_ context.Context, profile contract.TelegramProfi
 	return f.err
 }
 
-func (f *fakeUsers) NotificationsMuted(_ context.Context, _ int64) (bool, error) {
-	return f.muted, nil
+func (f *fakeUsers) AllowNotifications(_ context.Context, _ int64) (bool, error) {
+	return f.allow, nil
 }
 
-func (f *fakeUsers) SetNotificationsMuted(_ context.Context, _ int64, muted bool) error {
-	f.muted = muted
+func (f *fakeUsers) SetAllowNotifications(_ context.Context, _ int64, allow bool) error {
+	f.allow = allow
 	return nil
 }
 
@@ -50,7 +50,7 @@ func TestHandleStartSavesProfileAndReplies(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	store := &fakeUsers{}
+	store := &fakeUsers{allow: true}
 	client := NewClient("123456:abcDEF_token-1")
 	client.base = srv.URL
 	app := &App{
@@ -118,7 +118,7 @@ func TestHandleMuteUpdatesKeyboard(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	store := &fakeUsers{}
+	store := &fakeUsers{allow: true}
 	client := NewClient("123456:abcDEF_token-1")
 	client.base = srv.URL
 	app := &App{
@@ -138,8 +138,8 @@ func TestHandleMuteUpdatesKeyboard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !store.muted {
-		t.Fatal("expected muted")
+	if store.allow {
+		t.Fatal("expected allow=false after mute")
 	}
 	text, _ := last["text"].(string)
 	if !strings.Contains(text, "Уведомления выключены") {

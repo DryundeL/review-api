@@ -12,7 +12,7 @@
 ```json
 {
   "language": "ru",
-  "notificationsMuted": false
+  "allowNotifications": true
 }
 ```
 
@@ -23,20 +23,20 @@
 ```json
 {
   "language": "en",
-  "notificationsMuted": true
+  "allowNotifications": false
 }
 ```
 
 | Поле | Правила |
 |---|---|
 | `language` | 2–16 символов `[A-Za-z0-9-]`, как Telegram `language_code` |
-| `notificationsMuted` | глобальный mute всех пушей |
+| `allowNotifications` | глобально разрешить пуши в бота (`true` по умолчанию) |
 
 **422** — битый `language` (`field: language`).
 
-При первом EnsureUser (логин / бот) создаётся строка settings: `language` = язык Telegram (или `en`), `notificationsMuted` = false. Повторный EnsureUser язык **не** перезаписывает.
+При первом EnsureUser (логин / бот) создаётся строка settings: `language` = язык Telegram (или `en`), `allowNotifications` = true. Повторный EnsureUser язык **не** перезаписывает.
 
-Бот `/mute` / `/unmute` пишет в то же поле `notificationsMuted`.
+Бот `/mute` → `allowNotifications=false`, `/unmute` → `true`.
 
 ---
 
@@ -89,8 +89,8 @@ Prefs — одна строка на юзера с колонками `like_enab
 | Pref | Результат |
 |---|---|
 | type `enabled: false` | ничего: ни inbox, ни бот |
-| type on + `notificationsMuted: true` | строка в inbox, бот молчит |
-| type on + mute off | inbox + сообщение от бота |
+| type on + `allowNotifications: false` | строка в inbox, бот молчит |
+| type on + allow on | inbox + сообщение от бота |
 
 Текст: `notification_types.text` + динамика (`: @user · «обзор»`).
 

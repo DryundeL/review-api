@@ -98,7 +98,7 @@ func (h *Handler) PatchSettings(c echo.Context) error {
 	}
 	s, err := h.update.Handle(c.Request().Context(), userID, command.UpdateSettingsInput{
 		Language:           body.Language,
-		NotificationsMuted: body.NotificationsMuted,
+		AllowNotifications: body.AllowNotifications,
 	})
 	if err != nil {
 		return mapSettingsError(err)
@@ -154,12 +154,12 @@ type profileResponse struct {
 
 type settingsResponse struct {
 	Language           string `json:"language"`
-	NotificationsMuted bool   `json:"notificationsMuted"`
+	AllowNotifications bool   `json:"allowNotifications"`
 }
 
 type settingsPatchBody struct {
 	Language           *string `json:"language"`
-	NotificationsMuted *bool   `json:"notificationsMuted"`
+	AllowNotifications *bool   `json:"allowNotifications"`
 }
 
 func profileJSON(card query.Card, includePrivate bool) profileResponse {
@@ -187,7 +187,7 @@ func profileJSON(card query.Card, includePrivate bool) profileResponse {
 func settingsJSON(s domain.Settings) settingsResponse {
 	return settingsResponse{
 		Language:           s.Language,
-		NotificationsMuted: s.NotificationsMuted,
+		AllowNotifications: s.AllowNotifications,
 	}
 }
 

@@ -22,7 +22,7 @@ import (
 type UserResolver interface {
 	UserID(ctx context.Context, telegramID int64) (uuid.UUID, error)
 	UserRef(ctx context.Context, userID uuid.UUID) (userscontract.UserRef, error)
-	NotificationsMutedByUserID(ctx context.Context, userID uuid.UUID) (bool, error)
+	AllowNotificationsByUserID(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
 type ReviewLookup interface {

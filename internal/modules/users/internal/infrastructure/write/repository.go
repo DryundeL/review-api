@@ -61,8 +61,8 @@ func (r *Repository) EnsureSettings(ctx context.Context, telegramID int64, langu
 		return contract.ErrNotFound
 	}
 	const query = `
-		INSERT INTO user_settings (user_id, language, notifications_muted)
-		SELECT id, $2, FALSE
+		INSERT INTO user_settings (user_id, language, allow_notifications)
+		SELECT id, $2, TRUE
 		FROM users
 		WHERE telegram_id = $1
 		ON CONFLICT (user_id) DO NOTHING
@@ -85,56 +85,56 @@ func (r *Repository) EnsureSettings(ctx context.Context, telegramID int64, langu
 	return nil
 }
 
-func (r *Repository) NotificationsMuted(ctx context.Context, telegramID int64) (bool, error) {
+func (r *Repository) AllowNotifications(ctx context.Context, telegramID int64) (bool, error) {
 	if r == nil || r.pool == nil || telegramID <= 0 {
 		return false, contract.ErrNotFound
 	}
 	const query = `
-		SELECT s.notifications_muted
+		SELECT s.allow_notifications
 		FROM user_settings s
 		JOIN users u ON u.id = s.user_id
 		WHERE u.telegram_id = $1
 	`
-	var muted bool
-	err := r.queryRow(ctx, query, telegramID).Scan(&muted)
+	var allow bool
+	err := r.queryRow(ctx, query, telegramID).Scan(&allow)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, contract.ErrNotFound
 	}
 	if err != nil {
-		return false, fmt.Errorf("notifications muted: %w", err)
+		return false, fmt.Errorf("allow notifications: %w", err)
 	}
-	return muted, nil
+	return allow, nil
 }
 
-func (r *Repository) NotificationsMutedByUserID(ctx context.Context, userID uuid.UUID) (bool, error) {
+func (r *Repository) AllowNotificationsByUserID(ctx context.Context, userID uuid.UUID) (bool, error) {
 	if r == nil || r.pool == nil || userID == uuid.Nil {
 		return false, contract.ErrNotFound
 	}
-	const query = `SELECT notifications_muted FROM user_settings WHERE user_id = $1`
-	var muted bool
-	err := r.queryRow(ctx, query, userID).Scan(&muted)
+	const query = `SELECT allow_notifications FROM user_settings WHERE user_id = $1`
+	var allow bool
+	err := r.queryRow(ctx, query, userID).Scan(&allow)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil // no settings row → treat as unmuted
+		return true, nil // no settings row → allow by default
 	}
 	if err != nil {
-		return false, fmt.Errorf("notifications muted by user: %w", err)
+		return false, fmt.Errorf("allow notifications by user: %w", err)
 	}
-	return muted, nil
+	return allow, nil
 }
 
-func (r *Repository) SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error {
+func (r *Repository) SetAllowNotifications(ctx context.Context, telegramID int64, allow bool) error {
 	if r == nil || r.pool == nil || telegramID <= 0 {
 		return contract.ErrNotFound
 	}
 	const query = `
 		UPDATE user_settings s
-		SET notifications_muted = $2, updated_at = NOW()
+		SET allow_notifications = $2, updated_at = NOW()
 		FROM users u
 		WHERE s.user_id = u.id AND u.telegram_id = $1
 	`
-	tag, err := r.execTag(ctx, query, telegramID, muted)
+	tag, err := r.execTag(ctx, query, telegramID, allow)
 	if err != nil {
-		return fmt.Errorf("set notifications muted: %w", err)
+		return fmt.Errorf("set allow notifications: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return contract.ErrNotFound
@@ -147,12 +147,12 @@ func (r *Repository) GetSettings(ctx context.Context, userID uuid.UUID) (domain.
 		return domain.Settings{}, contract.ErrNotFound
 	}
 	const query = `
-		SELECT user_id, language, notifications_muted
+		SELECT user_id, language, allow_notifications
 		FROM user_settings
 		WHERE user_id = $1
 	`
 	var s domain.Settings
-	err := r.queryRow(ctx, query, userID).Scan(&s.UserID, &s.Language, &s.NotificationsMuted)
+	err := r.queryRow(ctx, query, userID).Scan(&s.UserID, &s.Language, &s.AllowNotifications)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Settings{}, contract.ErrNotFound
 	}
@@ -162,20 +162,20 @@ func (r *Repository) GetSettings(ctx context.Context, userID uuid.UUID) (domain.
 	return s, nil
 }
 
-func (r *Repository) UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, muted *bool) (domain.Settings, error) {
+func (r *Repository) UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, allow *bool) (domain.Settings, error) {
 	if r == nil || r.pool == nil || userID == uuid.Nil {
 		return domain.Settings{}, contract.ErrNotFound
 	}
 	const query = `
 		UPDATE user_settings
 		SET language = COALESCE($2, language),
-		    notifications_muted = COALESCE($3, notifications_muted),
+		    allow_notifications = COALESCE($3, allow_notifications),
 		    updated_at = NOW()
 		WHERE user_id = $1
-		RETURNING user_id, language, notifications_muted
+		RETURNING user_id, language, allow_notifications
 	`
 	var s domain.Settings
-	err := r.queryRow(ctx, query, userID, language, muted).Scan(&s.UserID, &s.Language, &s.NotificationsMuted)
+	err := r.queryRow(ctx, query, userID, language, allow).Scan(&s.UserID, &s.Language, &s.AllowNotifications)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Settings{}, contract.ErrNotFound
 	}

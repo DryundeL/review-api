@@ -23,8 +23,8 @@ const serviceName = "review-api-bot"
 
 type userGateway interface {
 	EnsureUser(context.Context, contract.TelegramProfile) error
-	NotificationsMuted(context.Context, int64) (bool, error)
-	SetNotificationsMuted(context.Context, int64, bool) error
+	AllowNotifications(context.Context, int64) (bool, error)
+	SetAllowNotifications(context.Context, int64, bool) error
 }
 
 type App struct {
@@ -178,10 +178,11 @@ func (a *App) openPrivateChat(ctx context.Context, profile contract.TelegramProf
 	if chatID == 0 || a.miniAppURL == "" {
 		return nil
 	}
-	muted, err := a.users.NotificationsMuted(ctx, profile.TelegramID)
+	allow, err := a.users.AllowNotifications(ctx, profile.TelegramID)
 	if err != nil && !errors.Is(err, contract.ErrNotFound) {
 		return err
 	}
+	muted := err == nil && !allow
 	view := startMessage(profile, a.miniAppName, muted)
 	if err := a.client.SetChatMenuButton(ctx, chatID, view.MenuButton, a.miniAppURL); err != nil {
 		var api *APIError
@@ -201,7 +202,7 @@ func (a *App) setNotificationsMuted(ctx context.Context, profile contract.Telegr
 		}
 		return err
 	}
-	if err := a.users.SetNotificationsMuted(ctx, profile.TelegramID, muted); err != nil {
+	if err := a.users.SetAllowNotifications(ctx, profile.TelegramID, !muted); err != nil {
 		return err
 	}
 	ru := isRussian(profile.LanguageCode)

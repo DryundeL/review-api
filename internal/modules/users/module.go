@@ -86,25 +86,25 @@ func (m *Module) UserRef(ctx context.Context, userID uuid.UUID) (contract.UserRe
 	}, nil
 }
 
-func (m *Module) NotificationsMuted(ctx context.Context, telegramID int64) (bool, error) {
+func (m *Module) AllowNotifications(ctx context.Context, telegramID int64) (bool, error) {
 	if m == nil || m.prefs == nil {
 		return false, contract.ErrNotFound
 	}
-	return m.prefs.NotificationsMuted(ctx, telegramID)
+	return m.prefs.AllowNotifications(ctx, telegramID)
 }
 
-func (m *Module) NotificationsMutedByUserID(ctx context.Context, userID uuid.UUID) (bool, error) {
+func (m *Module) AllowNotificationsByUserID(ctx context.Context, userID uuid.UUID) (bool, error) {
 	if m == nil || m.prefs == nil {
 		return false, contract.ErrNotFound
 	}
-	return m.prefs.NotificationsMutedByUserID(ctx, userID)
+	return m.prefs.AllowNotificationsByUserID(ctx, userID)
 }
 
-func (m *Module) SetNotificationsMuted(ctx context.Context, telegramID int64, muted bool) error {
+func (m *Module) SetAllowNotifications(ctx context.Context, telegramID int64, allow bool) error {
 	if m == nil || m.prefs == nil {
 		return contract.ErrNotFound
 	}
-	return m.prefs.SetNotificationsMuted(ctx, telegramID, muted)
+	return m.prefs.SetAllowNotifications(ctx, telegramID, allow)
 }
 
 func (m *Module) SetAuth(auth echo.MiddlewareFunc) {

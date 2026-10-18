@@ -24,13 +24,13 @@ func (f *settingsFakeRepo) GetSettings(_ context.Context, userID uuid.UUID) (dom
 	return f.stored, nil
 }
 
-func (f *settingsFakeRepo) UpdateSettings(_ context.Context, userID uuid.UUID, language *string, muted *bool) (domain.Settings, error) {
+func (f *settingsFakeRepo) UpdateSettings(_ context.Context, userID uuid.UUID, language *string, allow *bool) (domain.Settings, error) {
 	f.stored.UserID = userID
 	if language != nil {
 		f.stored.Language = *language
 	}
-	if muted != nil {
-		f.stored.NotificationsMuted = *muted
+	if allow != nil {
+		f.stored.AllowNotifications = *allow
 	}
 	return f.stored, nil
 }
@@ -47,17 +47,17 @@ func TestUpdateSettingsHandlerValidatesLanguage(t *testing.T) {
 	}
 }
 
-func TestUpdateSettingsHandlerPatchesMute(t *testing.T) {
+func TestUpdateSettingsHandlerPatchesAllow(t *testing.T) {
 	t.Parallel()
-	repo := &settingsFakeRepo{stored: domain.Settings{Language: "ru"}}
+	repo := &settingsFakeRepo{stored: domain.Settings{Language: "ru", AllowNotifications: true}}
 	h := NewUpdateSettingsHandler(repo)
-	muted := true
+	allow := false
 	id := uuid.New()
-	got, err := h.Handle(context.Background(), id, UpdateSettingsInput{NotificationsMuted: &muted})
+	got, err := h.Handle(context.Background(), id, UpdateSettingsInput{AllowNotifications: &allow})
 	if err != nil {
 		t.Fatalf("handle: %v", err)
 	}
-	if !got.NotificationsMuted || got.Language != "ru" {
+	if got.AllowNotifications || got.Language != "ru" {
 		t.Fatalf("got = %+v", got)
 	}
 }

@@ -36,15 +36,15 @@ func (f *fakeRepo) EnsureSettings(_ context.Context, telegramID int64, _ string)
 	return nil
 }
 
-func (f *fakeRepo) NotificationsMuted(_ context.Context, _ int64) (bool, error) {
-	return false, nil
+func (f *fakeRepo) AllowNotifications(_ context.Context, _ int64) (bool, error) {
+	return true, nil
 }
 
-func (f *fakeRepo) NotificationsMutedByUserID(_ context.Context, _ uuid.UUID) (bool, error) {
-	return false, nil
+func (f *fakeRepo) AllowNotificationsByUserID(_ context.Context, _ uuid.UUID) (bool, error) {
+	return true, nil
 }
 
-func (f *fakeRepo) SetNotificationsMuted(_ context.Context, _ int64, _ bool) error {
+func (f *fakeRepo) SetAllowNotifications(_ context.Context, _ int64, _ bool) error {
 	return nil
 }
 

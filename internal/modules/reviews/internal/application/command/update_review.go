@@ -61,7 +61,7 @@ func (h *UpdateReviewHandler) Handle(ctx context.Context, reviewID, authorID uui
 	if err != nil {
 		return ports.Review{}, fmt.Errorf("update review: %w", err)
 	}
-	out, err := h.reader.Get(ctx, reviewID)
+	out, err := h.reader.Get(ctx, reviewID, authorID)
 	if err != nil {
 		return ports.Review{}, fmt.Errorf("update review read: %w", err)
 	}

@@ -35,20 +35,28 @@ func NewReviewRepository(pool *pgxpool.Pool) *ReviewRepository {
 	return &ReviewRepository{pool: pool}
 }
 
-func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (ports.Review, error) {
+func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (ports.Review, error) {
 	if r == nil || r.pool == nil || id == uuid.Nil {
 		return ports.Review{}, contract.ErrNotFound
 	}
 	const query = `
-		SELECT r.id, r.author_id, ` + mediaObjectSelectSQL + `, r.title, r.rating, r.status,
+		SELECT r.id, r.author_id, COALESCE(u.username, ''),
+			($2 <> '00000000-0000-0000-0000-000000000000'::uuid
+				AND EXISTS (
+					SELECT 1 FROM follows f
+					WHERE f.follower_id = $2 AND f.followee_id = r.author_id
+				)
+			) AS is_following,
+			` + mediaObjectSelectSQL + `, r.title, r.rating, r.status,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		INNER JOIN users u ON u.id = r.author_id
 		WHERE r.id = $1
 	`
-	item, err := scanReview(r.pool.QueryRow(ctx, query, id))
+	item, err := scanReview(r.pool.QueryRow(ctx, query, id, viewerID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ports.Review{}, contract.ErrNotFound
 	}
@@ -157,7 +165,7 @@ func scanReview(row pgx.Row) (ports.Review, error) {
 	var item ports.Review
 	var poster *string
 	err := row.Scan(
-		&item.ID, &item.AuthorID,
+		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.IsFollowing,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating, &item.Status,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
@@ -165,6 +173,7 @@ func scanReview(row pgx.Row) (ports.Review, error) {
 	if err != nil {
 		return ports.Review{}, err
 	}
+	item.Author.ID = item.AuthorID
 	if poster != nil {
 		item.MediaObject.PosterURL = *poster
 	}

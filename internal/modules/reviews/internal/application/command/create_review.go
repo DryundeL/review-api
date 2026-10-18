@@ -52,7 +52,7 @@ func (h *CreateReviewHandler) Handle(ctx context.Context, authorID uuid.UUID, dr
 	if err != nil {
 		return ports.Review{}, fmt.Errorf("create review: %w", err)
 	}
-	out, err := h.reader.Get(ctx, item.ID)
+	out, err := h.reader.Get(ctx, item.ID, authorID)
 	if err != nil {
 		return ports.Review{}, fmt.Errorf("create review read: %w", err)
 	}

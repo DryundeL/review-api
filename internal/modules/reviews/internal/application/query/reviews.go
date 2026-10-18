@@ -23,7 +23,7 @@ func (h *GetReviewHandler) Handle(ctx context.Context, id, viewerID uuid.UUID) (
 	if h == nil || h.repo == nil {
 		return ports.Review{}, contract.ErrInvalid
 	}
-	item, err := h.repo.Get(ctx, id)
+	item, err := h.repo.Get(ctx, id, viewerID)
 	if err != nil {
 		return ports.Review{}, err
 	}

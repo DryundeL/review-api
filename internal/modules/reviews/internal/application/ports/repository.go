@@ -42,11 +42,19 @@ type MediaObjectRef struct {
 	PosterURL string
 }
 
+// AuthorRef is the review author (TG nick may be empty). Filled by Get only.
+type AuthorRef struct {
+	ID          uuid.UUID
+	Username    string
+	IsFollowing bool
+}
+
 // Review is a read DTO for one review with counters.
-// Lists omit Blocks and set HasSpoilers; Get fills Blocks.
+// Lists omit Blocks/Author and set HasSpoilers; Get fills Blocks+Author.
 type Review struct {
 	ID            uuid.UUID
 	AuthorID      uuid.UUID
+	Author        AuthorRef
 	MediaObject   MediaObjectRef
 	Title         string
 	Rating        int16
@@ -68,7 +76,7 @@ type ReviewWriter interface {
 }
 
 type ReviewReader interface {
-	Get(ctx context.Context, id uuid.UUID) (Review, error)
+	Get(ctx context.Context, id, viewerID uuid.UUID) (Review, error)
 	ListByMedia(ctx context.Context, mediaObjectID uuid.UUID, limit int) ([]Review, error)
 	ListByAuthor(ctx context.Context, authorID uuid.UUID, publishedOnly bool, limit int) ([]Review, error)
 }

@@ -52,14 +52,14 @@ platform → auth → users, media → catalog → reviews → social → feed, 
 - Лента: два режима `following` и `popular`, фильтр типов в обоих. Курсор, page size 10.
 - `release_status` принадлежит `catalog` (произведение). Обзор предлагает обновление.
 - Без веб-скрапинга. Позже AniList/TMDB в то же поле.
-- Аватарка за 3 разных type. Рамка аватара за все 13 типов.
+- Аватарка за 3 разных type. Рамка аватара за все 14 типов.
 - Один опубликованный обзор на пару `(user, media_object)`. Правка — PATCH.
 - `type` тайтла задаётся при импорте и не меняется через публичный API.
-- Типы MVP, стартовый набор `review_types`: `manga`, `manhwa`, `manhua`, `light_novel`, `comic`, `book`, `series`, `movie`, `dorama`, `anime_series`, `anime_movie`, `cartoon_series`, `cartoon_movie`. Код `light_novel` — ранобэ, как в клиенте. Админ может добавить тип. Статусы публикации и релиза не расширяются через API.
+- Типы MVP, стартовый набор `review_types`: `manga`, `manhwa`, `manhua`, `light_novel`, `comic`, `book`, `series`, `movie`, `dorama`, `anime_series`, `anime_movie`, `cartoon_series`, `cartoon_movie`, `game`. Код `light_novel` — ранобэ, как в клиенте. Админ может добавить тип. Статусы публикации и релиза не расширяются через API.
 
 ## Вне скоупа
 
-Kafka/NATS, скрапинг, комментарии, тип `games`, свободные теги, несколько опубликованных обзоров на один тайтл, микросервисы.
+Kafka/NATS, скрапинг, комментарии, свободные теги, несколько опубликованных обзоров на один тайтл, микросервисы.
 
 ## Спеки
 

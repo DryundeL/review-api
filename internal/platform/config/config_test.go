@@ -35,7 +35,12 @@ func TestValidateRequiresSecrets(t *testing.T) {
 	cfg := &Config{
 		Database: DatabaseConfig{Host: "h", Port: "5432", DBName: "db"},
 		Redis:    RedisConfig{Host: "r", Port: "6379"},
-		App:      AppConfig{Env: "development", RateLimitPerMin: 60, WorkerBatch: 50},
+		App: AppConfig{
+			Env:                 "development",
+			RateLimitPerMin:     60,
+			WorkerBatch:         50,
+			ReportHideThreshold: 10,
+		},
 	}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error")
@@ -60,5 +65,30 @@ func TestValidateRequiresSecrets(t *testing.T) {
 	cfg.App.AdminToken = cfg.App.JWTSecret
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected admin token to differ from jwt")
+	}
+}
+
+func TestValidateReportHideThreshold(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{
+		Database: DatabaseConfig{Host: "h", Port: "5432", DBName: "db", Password: "root"},
+		Redis:    RedisConfig{Host: "r", Port: "6379"},
+		App: AppConfig{
+			Env:                 "development",
+			TelegramBotToken:    "tok",
+			TelegramBotUsername: "review_bot",
+			JWTSecret:           strings.Repeat("s", 32),
+			AdminToken:          strings.Repeat("a", 32),
+			RateLimitPerMin:     60,
+			WorkerBatch:         50,
+			ReportHideThreshold: 0,
+		},
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected REPORT_HIDE_THRESHOLD error")
+	}
+	cfg.App.ReportHideThreshold = 10
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -53,10 +53,11 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 	usersMod.SetAuth(authMod.Middlewares.Bearer)
 	admin := httpserver.AdminToken(cfg.App.AdminToken)
 	reviewsMod := reviews.New(reviews.Dependencies{
-		Pool:  pool,
-		Admin: admin,
-		Auth:  authMod.Middlewares.Bearer,
-		Users: usersMod,
+		Pool:                pool,
+		Admin:               admin,
+		Auth:                authMod.Middlewares.Bearer,
+		Users:               usersMod,
+		ReportHideThreshold: cfg.App.ReportHideThreshold,
 	})
 	catalogMod := catalog.New(catalog.Dependencies{
 		Pool:  pool,

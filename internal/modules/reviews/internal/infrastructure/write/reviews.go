@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"review-api/internal/modules/reviews/contract"
+	"review-api/internal/modules/reviews/internal/application/ports"
 	"review-api/internal/modules/reviews/internal/domain"
 	"review-api/internal/platform/transaction"
 )
@@ -57,14 +58,25 @@ func (r *ReviewRepository) Replace(ctx context.Context, item domain.Review) erro
 }
 
 func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (domain.Review, error) {
+	return r.get(ctx, id, false)
+}
+
+func (r *ReviewRepository) GetForUpdate(ctx context.Context, id uuid.UUID) (domain.Review, error) {
+	return r.get(ctx, id, true)
+}
+
+func (r *ReviewRepository) get(ctx context.Context, id uuid.UUID, forUpdate bool) (domain.Review, error) {
 	if id == uuid.Nil {
 		return domain.Review{}, contract.ErrNotFound
 	}
-	const query = `
+	query := `
 		SELECT id, author_id, media_object_id, title, rating, status
 		FROM reviews
 		WHERE id = $1
 	`
+	if forUpdate {
+		query += ` FOR UPDATE`
+	}
 	var item domain.Review
 	err := r.queryRow(ctx, query, id).Scan(
 		&item.ID, &item.AuthorID, &item.MediaObjectID, &item.Title, &item.Rating, &item.Status,
@@ -74,6 +86,9 @@ func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (domain.Review
 	}
 	if err != nil {
 		return domain.Review{}, fmt.Errorf("get review: %w", err)
+	}
+	if forUpdate {
+		return item, nil
 	}
 	blocks, err := r.loadBlocks(ctx, id)
 	if err != nil {
@@ -148,6 +163,48 @@ func voteLikesDelta(prev *bool, isLike bool) int {
 		return 1
 	}
 	return -1
+}
+
+func (r *ReviewRepository) InsertReport(ctx context.Context, report ports.Report) error {
+	const query = `
+		INSERT INTO review_reports (id, review_id, reporter_id, reason_code, created_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	if err := r.exec(ctx, query,
+		report.ID, report.ReviewID, report.ReporterID, report.ReasonCode, report.CreatedAt,
+	); err != nil {
+		return mapReviewWriteError(err)
+	}
+	return nil
+}
+
+func (r *ReviewRepository) CountDistinctReporters(ctx context.Context, reviewID uuid.UUID) (int, error) {
+	const query = `
+		SELECT COUNT(*)::int
+		FROM review_reports
+		WHERE review_id = $1
+	`
+	var n int
+	if err := r.queryRow(ctx, query, reviewID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count reporters: %w", err)
+	}
+	return n, nil
+}
+
+func (r *ReviewRepository) Unpublish(ctx context.Context, reviewID uuid.UUID) error {
+	const query = `
+		UPDATE reviews
+		SET status = 'draft', updated_at = NOW()
+		WHERE id = $1 AND status = 'published'
+	`
+	tag, err := r.execTag(ctx, query, reviewID)
+	if err != nil {
+		return mapReviewWriteError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return contract.ErrNotFound
+	}
+	return nil
 }
 
 func (r *ReviewRepository) InsertView(ctx context.Context, reviewID, userID uuid.UUID) (bool, error) {
@@ -252,14 +309,19 @@ func mapReviewWriteError(err error) error {
 		switch pgErr.ConstraintName {
 		case "reviews_media_object_id_fkey":
 			return contract.FieldError{Field: "mediaObjectId"}
-		case "reviews_author_id_fkey", "review_votes_user_id_fkey", "review_views_user_id_fkey":
+		case "reviews_author_id_fkey", "review_votes_user_id_fkey", "review_views_user_id_fkey", "review_reports_reporter_id_fkey":
 			return contract.FieldError{Field: "userId"}
-		case "review_votes_review_id_fkey", "review_views_review_id_fkey":
+		case "review_votes_review_id_fkey", "review_views_review_id_fkey", "review_reports_review_id_fkey":
 			return contract.ErrNotFound
+		case "review_reports_reason_code_fkey":
+			return contract.FieldError{Field: "reasonCode"}
 		default:
 			return contract.FieldError{Field: "body"}
 		}
 	case "23505":
+		if pgErr.ConstraintName == "review_reports_review_reporter_uidx" {
+			return contract.ErrAlreadyReported
+		}
 		return contract.ErrConflict
 	case "23514":
 		return contract.FieldError{Field: "body"}

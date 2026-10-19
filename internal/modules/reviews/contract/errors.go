@@ -3,10 +3,11 @@ package contract
 import "errors"
 
 var (
-	ErrNotFound  = errors.New("not found")
-	ErrConflict  = errors.New("conflict")
-	ErrInvalid   = errors.New("invalid")
-	ErrForbidden = errors.New("forbidden")
+	ErrNotFound        = errors.New("not found")
+	ErrConflict        = errors.New("conflict")
+	ErrAlreadyReported = errors.New("already reported")
+	ErrInvalid         = errors.New("invalid")
+	ErrForbidden       = errors.New("forbidden")
 )
 
 // FieldError names the rejected field. The field is a fixed token, never raw input.

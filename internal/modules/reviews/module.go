@@ -23,10 +23,11 @@ type UserResolver interface {
 }
 
 type Dependencies struct {
-	Pool  *pgxpool.Pool
-	Admin echo.MiddlewareFunc
-	Auth  echo.MiddlewareFunc
-	Users UserResolver
+	Pool                *pgxpool.Pool
+	Admin               echo.MiddlewareFunc
+	Auth                echo.MiddlewareFunc
+	Users               UserResolver
+	ReportHideThreshold int
 }
 
 type Module struct {
@@ -40,6 +41,8 @@ type Module struct {
 	listReviews  *query.ListReviewsHandler
 	voteReview   *command.VoteReviewHandler
 	viewReview   *command.ViewReviewHandler
+	listReasons  *query.ListReasonsHandler
+	createReport *command.CreateReportHandler
 	types        *read.Repository
 	users        UserResolver
 	admin        echo.MiddlewareFunc
@@ -53,6 +56,10 @@ func New(deps Dependencies) *Module {
 	reviewReader := read.NewReviewRepository(deps.Pool)
 	tx := transaction.NewPgxManager(deps.Pool)
 	pub := outboxpub.New(outbox.NewStore(deps.Pool))
+	threshold := deps.ReportHideThreshold
+	if threshold < 1 {
+		threshold = 10
+	}
 	return &Module{
 		list:         query.NewListTypesHandler(typeReader),
 		create:       command.NewCreateTypeHandler(typeWriter),
@@ -64,6 +71,8 @@ func New(deps Dependencies) *Module {
 		listReviews:  query.NewListReviewsHandler(reviewReader),
 		voteReview:   command.NewVoteReviewHandler(reviewWriter, tx, pub),
 		viewReview:   command.NewViewReviewHandler(reviewWriter, tx, pub),
+		listReasons:  query.NewListReasonsHandler(typeReader),
+		createReport: command.NewCreateReportHandler(reviewWriter, typeReader, tx, pub, threshold),
 		types:        typeReader,
 		users:        deps.Users,
 		admin:        deps.Admin,
@@ -127,6 +136,8 @@ func (m *Module) RegisterHTTP(g *echo.Group) {
 		ListReviews:  m.listReviews,
 		VoteReview:   m.voteReview,
 		ViewReview:   m.viewReview,
+		ListReasons:  m.listReasons,
+		CreateReport: m.createReport,
 		Users:        m.users,
 	}), m.admin, m.auth)
 }

@@ -9,6 +9,7 @@ import (
 func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
 	g.GET("/review-types", h.List)
 	g.GET("/review-statuses", h.Statuses)
+	g.GET("/report-reasons", h.ListReportReasons)
 
 	if auth == nil {
 		auth = denyUnauthorized
@@ -27,6 +28,7 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
 	g.DELETE("/reviews/:id", h.DeleteReview, auth)
 	g.PUT("/reviews/:id/vote", h.VoteReview, auth)
 	g.PUT("/reviews/:id/view", h.ViewReview, auth)
+	g.POST("/reviews/:id/reports", h.CreateReport, auth)
 
 	adminGroup := g.Group("/admin/review-types", admin)
 	adminGroup.GET("", h.AdminList)

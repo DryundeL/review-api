@@ -68,6 +68,7 @@ type AppConfig struct {
 	WorkerPoll          time.Duration
 	WorkerBatch         int
 	AdminToken          string
+	ReportHideThreshold int
 }
 
 func Load() (*Config, error) {
@@ -92,6 +93,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	workerPoll, err := durationDefault("WORKER_POLL_INTERVAL", 2*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	reportHideThreshold, err := atoiDefault("REPORT_HIDE_THRESHOLD", 10)
 	if err != nil {
 		return nil, err
 	}
@@ -128,6 +133,7 @@ func Load() (*Config, error) {
 			WorkerPoll:          workerPoll,
 			WorkerBatch:         workerBatch,
 			AdminToken:          os.Getenv("ADMIN_TOKEN"),
+			ReportHideThreshold: reportHideThreshold,
 		},
 	}
 
@@ -164,6 +170,9 @@ func (c *Config) Validate() error {
 	}
 	if c.App.WorkerBatch < 1 {
 		return fmt.Errorf("WORKER_BATCH_SIZE must be >= 1")
+	}
+	if c.App.ReportHideThreshold < 1 {
+		return fmt.Errorf("REPORT_HIDE_THRESHOLD must be >= 1")
 	}
 	switch c.App.Env {
 	case "development", "staging", "production":

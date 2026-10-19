@@ -1,7 +1,8 @@
 package contract
 
 const (
-	EventPublished = "review.published"
-	EventVoted     = "review.voted"
-	EventViewed    = "review.viewed"
+	EventPublished   = "review.published"
+	EventUnpublished = "review.unpublished"
+	EventVoted       = "review.voted"
+	EventViewed      = "review.viewed"
 )

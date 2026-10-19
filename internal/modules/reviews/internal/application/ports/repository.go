@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -67,13 +68,38 @@ type Review struct {
 	ViewsCount    int64
 }
 
+// Reason is one active report_reasons row for the public catalog.
+type Reason struct {
+	Code      string
+	Label     string
+	SortOrder int
+}
+
+// Report is a persisted review complaint.
+type Report struct {
+	ID         uuid.UUID
+	ReviewID   uuid.UUID
+	ReporterID uuid.UUID
+	ReasonCode string
+	CreatedAt  time.Time
+}
+
+type ReasonReader interface {
+	ListActive(ctx context.Context) ([]Reason, error)
+	IsActive(ctx context.Context, code string) (bool, error)
+}
+
 type ReviewWriter interface {
 	Create(ctx context.Context, item domain.Review) error
 	Replace(ctx context.Context, item domain.Review) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	Get(ctx context.Context, id uuid.UUID) (domain.Review, error)
+	GetForUpdate(ctx context.Context, id uuid.UUID) (domain.Review, error)
 	UpsertVote(ctx context.Context, reviewID, userID uuid.UUID, isLike bool) error
 	InsertView(ctx context.Context, reviewID, userID uuid.UUID) (inserted bool, err error)
+	InsertReport(ctx context.Context, report Report) error
+	CountDistinctReporters(ctx context.Context, reviewID uuid.UUID) (int, error)
+	Unpublish(ctx context.Context, reviewID uuid.UUID) error
 }
 
 type ReviewReader interface {

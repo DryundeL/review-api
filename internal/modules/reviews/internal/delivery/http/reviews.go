@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -30,6 +31,26 @@ type reviewBlockBody struct {
 
 type voteBody struct {
 	IsLike bool `json:"isLike"`
+}
+
+type reportBody struct {
+	ReasonCode string `json:"reasonCode"`
+}
+
+type reportJSON struct {
+	ID         string `json:"id"`
+	ReviewID   string `json:"reviewId"`
+	ReasonCode string `json:"reasonCode"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+type reasonJSON struct {
+	Code  string `json:"code"`
+	Label string `json:"label"`
+}
+
+type reasonsListResponse struct {
+	Items []reasonJSON `json:"items"`
 }
 
 type reviewJSON struct {
@@ -225,6 +246,44 @@ func (h *Handler) ViewReview(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *Handler) ListReportReasons(c echo.Context) error {
+	items, err := h.listReasons.Handle(c.Request().Context())
+	if err != nil {
+		return mapReviewError(err)
+	}
+	out := make([]reasonJSON, 0, len(items))
+	for _, item := range items {
+		out = append(out, reasonJSON{Code: item.Code, Label: item.Label})
+	}
+	return c.JSON(http.StatusOK, reasonsListResponse{Items: out})
+}
+
+func (h *Handler) CreateReport(c echo.Context) error {
+	userID, err := h.resolveUser(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "review not found")
+	}
+	var body reportBody
+	if err := c.Bind(&body); err != nil {
+		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	}
+	item, err := h.createReport.Handle(c.Request().Context(), id, userID, body.ReasonCode)
+	if err != nil {
+		return mapReviewError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusCreated, reportJSON{
+		ID:         item.ID.String(),
+		ReviewID:   item.ReviewID.String(),
+		ReasonCode: item.ReasonCode,
+		CreatedAt:  item.CreatedAt.UTC().Format(time.RFC3339Nano),
+	})
+}
+
 func (h *Handler) resolveUser(c echo.Context) (uuid.UUID, error) {
 	id, err := authcontract.IdentityFromContext(c.Request().Context())
 	if err != nil {
@@ -353,6 +412,8 @@ func mapReviewError(err error) error {
 		}
 	case errors.Is(err, contract.ErrNotFound):
 		return httperr.New(http.StatusNotFound, "NOT_FOUND", "review not found")
+	case errors.Is(err, contract.ErrAlreadyReported):
+		return httperr.New(http.StatusConflict, "ALREADY_REPORTED", "review already reported")
 	case errors.Is(err, contract.ErrConflict):
 		return httperr.New(http.StatusConflict, "CONFLICT", "review already published for this title")
 	case errors.Is(err, contract.ErrForbidden):

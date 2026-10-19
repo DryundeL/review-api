@@ -44,6 +44,8 @@ type Handler struct {
 	listReviews  *query.ListReviewsHandler
 	voteReview   *command.VoteReviewHandler
 	viewReview   *command.ViewReviewHandler
+	listReasons  *query.ListReasonsHandler
+	createReport *command.CreateReportHandler
 	users        UserResolver
 }
 
@@ -59,6 +61,8 @@ type HandlerDeps struct {
 	ListReviews  *query.ListReviewsHandler
 	VoteReview   *command.VoteReviewHandler
 	ViewReview   *command.ViewReviewHandler
+	ListReasons  *query.ListReasonsHandler
+	CreateReport *command.CreateReportHandler
 	Users        UserResolver
 }
 
@@ -75,6 +79,8 @@ func NewHandler(deps HandlerDeps) *Handler {
 		listReviews:  deps.ListReviews,
 		voteReview:   deps.VoteReview,
 		viewReview:   deps.ViewReview,
+		listReasons:  deps.ListReasons,
+		createReport: deps.CreateReport,
 		users:        deps.Users,
 	}
 }

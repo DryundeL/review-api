@@ -17,7 +17,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | users | BC | Профиль, аватар, `popularity_score`, EnsureUser по Telegram identity | auth (contract), media |
 | media | BC | Upload, magic-bytes, лимиты, S3-compatible, без SVG | auth |
 | catalog | BC | Тайтлы (`media_objects`): название, type, год, poster, `release_status`, поиск; пакетный импорт только admin | auth, media, reviews (коды типов) |
-| reviews | BC | Черновик/публикация, блоки (`review_blocks`, ≤10), голоса (`review_votes`), просмотры (`review_views`). Справочник `review_types`. Статусы — конфиг модуля | catalog, media, users |
+| reviews | BC | Черновик/публикация, блоки (`review_blocks`, ≤10), голоса (`review_votes`), просмотры (`review_views`), жалобы (`review_reports` + `report_reasons`, автоснятие по порогу). Справочник `review_types`. Статусы — конфиг модуля | catalog, media, users |
 | social | BC | Подписки (`follows`) | users |
 | feed | BC | Read-side лента: курсор, фильтр типов, режимы `following` / `popular` | reviews, social, users |
 | search | BC | Read-side поиск: trends-табы (media / authors / types) + общий текстовый поиск (`@username`, название обзора, media object) | reviews, catalog, social, users |
@@ -39,6 +39,7 @@ platform → auth → users, media → catalog → reviews → social → feed, 
 | Событие | Продюсер | Консьюмеры |
 |---|---|---|
 | `review.published` | reviews | feed, gamification, users (popularity), notifications |
+| `review.unpublished` | reviews | — (позже notifications; feed/search читают `status`) |
 | `review.voted` | reviews | feed, users, notifications |
 | `review.viewed` | reviews | feed (батч, не каждый хит) |
 | `user.followed` | social | feed, notifications |

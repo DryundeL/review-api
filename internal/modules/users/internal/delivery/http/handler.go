@@ -157,9 +157,9 @@ type profileResponse struct {
 	TelegramID     *int64 `json:"telegramId,omitempty"`
 	LanguageCode   string `json:"languageCode,omitempty"`
 	IsPremium      *bool  `json:"isPremium,omitempty"`
-	Background  string `json:"background,omitempty"`
-	AvatarFrame string `json:"avatarFrame,omitempty"`
-	Backdrop    string `json:"backdrop,omitempty"`
+	Background     string `json:"background,omitempty"`
+	AvatarFrame    string `json:"avatarFrame,omitempty"`
+	Backdrop       string `json:"backdrop,omitempty"`
 }
 
 type settingsResponse struct {

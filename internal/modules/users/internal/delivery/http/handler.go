@@ -10,6 +10,7 @@ import (
 
 	"review-api/internal/http/httperr"
 	authcontract "review-api/internal/modules/auth/contract"
+	gamificationcontract "review-api/internal/modules/gamification/contract"
 	"review-api/internal/modules/users/contract"
 	"review-api/internal/modules/users/internal/application/command"
 	"review-api/internal/modules/users/internal/application/query"
@@ -20,11 +21,16 @@ type UserResolver interface {
 	UserID(ctx context.Context, telegramID int64) (uuid.UUID, error)
 }
 
+type CosmeticsLookup interface {
+	Cosmetics(ctx context.Context, userID uuid.UUID) (gamificationcontract.Cosmetics, error)
+}
+
 type Handler struct {
-	profile  *query.GetProfileHandler
-	settings *query.GetSettingsHandler
-	update   *command.UpdateSettingsHandler
-	users    UserResolver
+	profile   *query.GetProfileHandler
+	settings  *query.GetSettingsHandler
+	update    *command.UpdateSettingsHandler
+	users     UserResolver
+	cosmetics CosmeticsLookup
 }
 
 func NewHandler(
@@ -32,8 +38,9 @@ func NewHandler(
 	settings *query.GetSettingsHandler,
 	update *command.UpdateSettingsHandler,
 	users UserResolver,
+	cosmetics CosmeticsLookup,
 ) *Handler {
-	return &Handler{profile: profile, settings: settings, update: update, users: users}
+	return &Handler{profile: profile, settings: settings, update: update, users: users, cosmetics: cosmetics}
 }
 
 func (h *Handler) Profile(c echo.Context) error {
@@ -49,7 +56,7 @@ func (h *Handler) Profile(c echo.Context) error {
 		return err
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
-	return c.JSON(http.StatusOK, profileJSON(card, true))
+	return c.JSON(http.StatusOK, h.profileJSON(c.Request().Context(), card, true))
 }
 
 func (h *Handler) PublicProfile(c echo.Context) error {
@@ -71,7 +78,7 @@ func (h *Handler) PublicProfile(c echo.Context) error {
 	if card.IsMe {
 		c.Response().Header().Set("Cache-Control", "no-store")
 	}
-	return c.JSON(http.StatusOK, profileJSON(card, card.IsMe))
+	return c.JSON(http.StatusOK, h.profileJSON(c.Request().Context(), card, card.IsMe))
 }
 
 func (h *Handler) GetSettings(c echo.Context) error {
@@ -150,6 +157,9 @@ type profileResponse struct {
 	TelegramID     *int64 `json:"telegramId,omitempty"`
 	LanguageCode   string `json:"languageCode,omitempty"`
 	IsPremium      *bool  `json:"isPremium,omitempty"`
+	Background  string `json:"background,omitempty"`
+	AvatarFrame string `json:"avatarFrame,omitempty"`
+	Backdrop    string `json:"backdrop,omitempty"`
 }
 
 type settingsResponse struct {
@@ -162,7 +172,7 @@ type settingsPatchBody struct {
 	AllowNotifications *bool   `json:"allowNotifications"`
 }
 
-func profileJSON(card query.Card, includePrivate bool) profileResponse {
+func (h *Handler) profileJSON(ctx context.Context, card query.Card, includePrivate bool) profileResponse {
 	out := profileResponse{
 		ID:             card.User.ID.String(),
 		Username:       card.User.Username,
@@ -180,6 +190,13 @@ func profileJSON(card query.Card, includePrivate bool) profileResponse {
 		out.TelegramID = &tid
 		out.LanguageCode = card.User.LanguageCode
 		out.IsPremium = &prem
+	}
+	if h.cosmetics != nil {
+		if cos, err := h.cosmetics.Cosmetics(ctx, card.User.ID); err == nil {
+			out.Background = cos.Background
+			out.AvatarFrame = cos.AvatarFrame
+			out.Backdrop = cos.Backdrop
+		}
 	}
 	return out
 }

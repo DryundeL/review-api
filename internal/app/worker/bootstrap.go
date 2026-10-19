@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"review-api/internal/app/bot"
+	"review-api/internal/modules/gamification"
 	"review-api/internal/modules/notifications"
 	"review-api/internal/modules/reviews"
 	"review-api/internal/modules/users"
@@ -50,9 +51,21 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		Bot:     bot.NewClient(cfg.App.TelegramBotToken),
 		Log:     log,
 	})
+	gamificationMod := gamification.New(gamification.Dependencies{
+		Pool:    pool,
+		Users:   usersMod,
+		Reviews: reviewsMod,
+		Points: gamification.PointsConfig{
+			ReviewPerBlock: cfg.App.PointsReviewPerBlock,
+			LikeGiven:      cfg.App.PointsLikeGiven,
+			LikeReceived:   cfg.App.PointsLikeReceived,
+			Follower:       cfg.App.PointsFollower,
+		},
+	})
 
 	dispatcher := eventbus.NewDispatcher()
 	notifMod.RegisterConsumers(dispatcher)
+	gamificationMod.RegisterConsumers(dispatcher)
 	bus := eventbus.Fanout{Pubs: []eventbus.Publisher{
 		eventbus.LoggingPublisher{Log: log},
 		dispatcher,

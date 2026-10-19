@@ -79,6 +79,7 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		Feed:          modules.Feed,
 		Search:        modules.Search,
 		Notifications: modules.Notifications,
+		Gamification:  modules.Gamification,
 	}, routes.APIOptions{
 		Redis:           rdb,
 		RateLimitPerMin: cfg.App.RateLimitPerMin,

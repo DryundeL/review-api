@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	authcontract "review-api/internal/modules/auth/contract"
+	gamificationcontract "review-api/internal/modules/gamification/contract"
 	"review-api/internal/modules/users/contract"
 	"review-api/internal/modules/users/internal/application/command"
 	"review-api/internal/modules/users/internal/application/ports"
@@ -16,6 +17,10 @@ import (
 	"review-api/internal/modules/users/internal/infrastructure/read"
 	"review-api/internal/modules/users/internal/infrastructure/write"
 )
+
+type CosmeticsLookup interface {
+	Cosmetics(ctx context.Context, userID uuid.UUID) (gamificationcontract.Cosmetics, error)
+}
 
 type Dependencies struct {
 	Pool *pgxpool.Pool
@@ -28,6 +33,7 @@ type Module struct {
 	getSettings    *query.GetSettingsHandler
 	updateSettings *command.UpdateSettingsHandler
 	prefs          ports.UserRepository
+	cosmetics      CosmeticsLookup
 	auth           echo.MiddlewareFunc
 }
 
@@ -111,6 +117,10 @@ func (m *Module) SetAuth(auth echo.MiddlewareFunc) {
 	m.auth = auth
 }
 
+func (m *Module) SetCosmetics(c CosmeticsLookup) {
+	m.cosmetics = c
+}
+
 func (m *Module) RegisterHTTP(g *echo.Group) {
-	usershttp.Register(g, usershttp.NewHandler(m.profile, m.getSettings, m.updateSettings, m), m.auth)
+	usershttp.Register(g, usershttp.NewHandler(m.profile, m.getSettings, m.updateSettings, m, m.cosmetics), m.auth)
 }

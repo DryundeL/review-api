@@ -9,6 +9,7 @@ import (
 	authmodule "review-api/internal/modules/auth"
 	catalogmodule "review-api/internal/modules/catalog"
 	feedmodule "review-api/internal/modules/feed"
+	gamificationmodule "review-api/internal/modules/gamification"
 	notificationsmodule "review-api/internal/modules/notifications"
 	reviewsmodule "review-api/internal/modules/reviews"
 	searchmodule "review-api/internal/modules/search"
@@ -26,6 +27,7 @@ type APIModules struct {
 	Feed          *feedmodule.Module
 	Search        *searchmodule.Module
 	Notifications *notificationsmodule.Module
+	Gamification  *gamificationmodule.Module
 }
 
 type APIOptions struct {
@@ -59,5 +61,8 @@ func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 	}
 	if modules.Notifications != nil {
 		modules.Notifications.RegisterHTTP(v1)
+	}
+	if modules.Gamification != nil {
+		modules.Gamification.RegisterHTTP(v1)
 	}
 }

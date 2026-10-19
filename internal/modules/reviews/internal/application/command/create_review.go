@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 
@@ -45,6 +46,7 @@ func (h *CreateReviewHandler) Handle(ctx context.Context, authorID uuid.UUID, dr
 				"id":            item.ID.String(),
 				"authorId":      item.AuthorID.String(),
 				"mediaObjectId": item.MediaObjectID.String(),
+				"blockCount":    strconv.Itoa(len(item.Blocks)),
 			})
 		}
 		return nil

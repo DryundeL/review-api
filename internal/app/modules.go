@@ -12,6 +12,7 @@ import (
 	"review-api/internal/modules/catalog"
 	catalogcontract "review-api/internal/modules/catalog/contract"
 	"review-api/internal/modules/feed"
+	"review-api/internal/modules/gamification"
 	"review-api/internal/modules/notifications"
 	"review-api/internal/modules/reviews"
 	reviewscontract "review-api/internal/modules/reviews/contract"
@@ -32,6 +33,7 @@ type Modules struct {
 	Feed          *feed.Module
 	Search        *search.Module
 	Notifications *notifications.Module
+	Gamification  *gamification.Module
 }
 
 func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modules {
@@ -85,10 +87,25 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		Users:   usersMod,
 		Reviews: reviewsMod,
 	})
+	gamificationMod := gamification.New(gamification.Dependencies{
+		Pool:    pool,
+		Redis:   rdb,
+		Admin:   admin,
+		Auth:    authMod.Middlewares.Bearer,
+		Users:   usersMod,
+		Reviews: reviewsMod,
+		Points: gamification.PointsConfig{
+			ReviewPerBlock: cfg.App.PointsReviewPerBlock,
+			LikeGiven:      cfg.App.PointsLikeGiven,
+			LikeReceived:   cfg.App.PointsLikeReceived,
+			Follower:       cfg.App.PointsFollower,
+		},
+	})
+	usersMod.SetCosmetics(gamificationMod)
 	return Modules{
 		Auth: authMod, Users: usersMod, Reviews: reviewsMod,
 		Catalog: catalogMod, Social: socialMod, Feed: feedMod, Search: searchMod,
-		Notifications: notificationsMod,
+		Notifications: notificationsMod, Gamification: gamificationMod,
 	}
 }
 

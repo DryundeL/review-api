@@ -55,6 +55,8 @@ type ReviewHit struct {
 	AuthorID    uuid.UUID
 	Username    string
 	PhotoURL    string
+	AvatarFrame string
+	Backdrop    string
 	MediaObject MediaRef
 	Rating      int16
 	LikesCount  int64

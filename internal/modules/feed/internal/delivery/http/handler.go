@@ -47,6 +47,8 @@ type authorJSON struct {
 	Username    string `json:"username"`
 	PhotoURL    string `json:"photoUrl,omitempty"`
 	IsFollowing bool   `json:"isFollowing"`
+	AvatarFrame string `json:"avatarFrame,omitempty"`
+	Backdrop    string `json:"backdrop,omitempty"`
 }
 
 type mediaObjectJSON struct {
@@ -128,6 +130,8 @@ func itemJSON(item ports.Item) feedItemJSON {
 			Username:    item.Author.Username,
 			PhotoURL:    item.Author.PhotoURL,
 			IsFollowing: item.Author.IsFollowing,
+			AvatarFrame: item.Author.AvatarFrame,
+			Backdrop:    item.Author.Backdrop,
 		},
 		MediaObject:   mediaJSON(item.MediaObject),
 		Title:         item.Title,

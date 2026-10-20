@@ -75,6 +75,8 @@ type reviewHitJSON struct {
 	AuthorID    string       `json:"authorId"`
 	Username    string       `json:"username"`
 	PhotoURL    string       `json:"photoUrl,omitempty"`
+	AvatarFrame string       `json:"avatarFrame,omitempty"`
+	Backdrop    string       `json:"backdrop,omitempty"`
 	MediaObject mediaRefJSON `json:"mediaObject"`
 	Rating      int16        `json:"rating"`
 	LikesCount  int64        `json:"likesCount"`
@@ -155,7 +157,7 @@ func (h *Handler) Search(c echo.Context) error {
 	for _, r := range result.Reviews {
 		reviews = append(reviews, reviewHitJSON{
 			ID: r.ID.String(), Title: r.Title, AuthorID: r.AuthorID.String(), Username: r.Username,
-			PhotoURL: r.PhotoURL,
+			PhotoURL: r.PhotoURL, AvatarFrame: r.AvatarFrame, Backdrop: r.Backdrop,
 			MediaObject: mediaRefJSON{
 				ID: r.MediaObject.ID.String(), Title: r.MediaObject.Title,
 				Type: r.MediaObject.Type, PosterURL: r.MediaObject.PosterURL,

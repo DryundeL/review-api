@@ -92,6 +92,8 @@ Auth: **Bearer**.
 
 Баланс и owned на чужой карточке **не** отдаются.
 
+В ленте и списках/карточке обзора те же `author.avatarFrame` и `author.backdrop` (без `background`).
+
 ## Админ
 
 Заголовок `X-Admin-Token`.

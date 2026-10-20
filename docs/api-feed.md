@@ -35,7 +35,9 @@
         "id": "uuid",
         "username": "ann",
         "photoUrl": "https://t.me/i/userpic/320/....jpg",
-        "isFollowing": true
+        "isFollowing": true,
+        "avatarFrame": "frame_gold",
+        "backdrop": "list_dark"
       },
       "mediaObject": {
         "id": "uuid",
@@ -60,6 +62,7 @@
 - `nextCursor`: `string` или `null`. Если `null` — конец ленты.
 - `author.username` — ник Telegram **без** `@`. Может быть `""`.
 - `author.photoUrl` — аватар Telegram CDN; может отсутствовать.
+- `author.avatarFrame` / `author.backdrop` — ключи экипировки из магазина; могут отсутствовать.
 - `author.id` === `authorId` — `GET /v1/profiles/{id}`, подписка. См. [api-social.md](api-social.md).
 
 ### Скролл / подгрузка

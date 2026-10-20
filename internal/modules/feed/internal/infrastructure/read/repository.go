@@ -58,6 +58,7 @@ func (r *Repository) List(ctx context.Context, p ports.ListParams) ([]ports.Item
 	b.WriteString(` AND f.followee_id = r.author_id
 				)
 			) AS is_following,
+			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
 			mo.id, mo.title, mo.type, mo.poster_url,
 			r.title, r.rating, `)
 	b.WriteString(spoilersExistSQL)
@@ -69,6 +70,7 @@ func (r *Repository) List(ctx context.Context, p ports.ListParams) ([]ports.Item
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
 		INNER JOIN users u ON u.id = r.author_id
+		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.status = 'published'
 	`)
 
@@ -155,6 +157,7 @@ func scanItem(row interface {
 	var poster *string
 	err := row.Scan(
 		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.PhotoURL, &item.Author.IsFollowing,
+		&item.Author.AvatarFrame, &item.Author.Backdrop,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating,
 		&item.HasSpoilers,

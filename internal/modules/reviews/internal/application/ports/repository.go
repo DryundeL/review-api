@@ -43,16 +43,18 @@ type MediaObjectRef struct {
 	PosterURL string
 }
 
-// AuthorRef is the review author (TG nick may be empty). Filled by Get only.
+// AuthorRef is the review author (TG nick may be empty).
 type AuthorRef struct {
 	ID          uuid.UUID
 	Username    string
 	PhotoURL    string
 	IsFollowing bool
+	AvatarFrame string
+	Backdrop    string
 }
 
 // Review is a read DTO for one review with counters.
-// Lists omit Blocks/Author and set HasSpoilers; Get fills Blocks+Author.
+// Lists omit Blocks and set HasSpoilers; Get fills Blocks.
 type Review struct {
 	ID            uuid.UUID
 	AuthorID      uuid.UUID

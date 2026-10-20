@@ -47,6 +47,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (por
 					WHERE f.follower_id = $2 AND f.followee_id = r.author_id
 				)
 			) AS is_following,
+			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
 			` + mediaObjectSelectSQL + `, r.title, r.rating, r.status,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
@@ -54,6 +55,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (por
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
 		INNER JOIN users u ON u.id = r.author_id
+		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.id = $1
 	`
 	item, err := scanReview(r.pool.QueryRow(ctx, query, id, viewerID))
@@ -77,13 +79,17 @@ func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID uuid.U
 		return nil, contract.FieldError{Field: "mediaObjectId"}
 	}
 	return r.list(ctx, `
-		SELECT r.id, r.author_id, `+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
+		SELECT r.id, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
+			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
+			`+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
 			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		INNER JOIN users u ON u.id = r.author_id
+		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.media_object_id = $1 AND r.status = 'published'
 		ORDER BY r.created_at DESC
 		LIMIT $2
@@ -99,13 +105,17 @@ func (r *ReviewRepository) ListByAuthor(ctx context.Context, authorID uuid.UUID,
 		statusFilter = " AND r.status = 'published'"
 	}
 	return r.list(ctx, `
-		SELECT r.id, r.author_id, `+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
+		SELECT r.id, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
+			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
+			`+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
 			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		INNER JOIN users u ON u.id = r.author_id
+		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.author_id = $1`+statusFilter+`
 		ORDER BY r.created_at DESC
 		LIMIT $2
@@ -166,6 +176,7 @@ func scanReview(row pgx.Row) (ports.Review, error) {
 	var poster *string
 	err := row.Scan(
 		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.PhotoURL, &item.Author.IsFollowing,
+		&item.Author.AvatarFrame, &item.Author.Backdrop,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating, &item.Status,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
@@ -184,7 +195,8 @@ func scanListReview(row pgx.Row) (ports.Review, error) {
 	var item ports.Review
 	var poster *string
 	err := row.Scan(
-		&item.ID, &item.AuthorID,
+		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.PhotoURL,
+		&item.Author.AvatarFrame, &item.Author.Backdrop,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating, &item.Status,
 		&item.HasSpoilers,
@@ -193,6 +205,7 @@ func scanListReview(row pgx.Row) (ports.Review, error) {
 	if err != nil {
 		return ports.Review{}, err
 	}
+	item.Author.ID = item.AuthorID
 	if poster != nil {
 		item.MediaObject.PosterURL = *poster
 	}

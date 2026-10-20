@@ -30,6 +30,8 @@ type AuthorRef struct {
 	Username    string
 	PhotoURL    string
 	IsFollowing bool
+	AvatarFrame string
+	Backdrop    string
 }
 
 // Item is one published review in the feed (list shape, no blocks).

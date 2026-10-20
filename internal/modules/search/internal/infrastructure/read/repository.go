@@ -179,11 +179,13 @@ func (r *Repository) SearchReviews(ctx context.Context, q string, limit int) ([]
 	like := escapeLike(q)
 	const sql = `
 		SELECT r.id, r.title, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
+			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
 			mo.id, mo.title, mo.type, mo.poster_url,
 			r.rating, r.likes_count, r.views_count
 		FROM reviews r
 		INNER JOIN users u ON u.id = r.author_id
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.status = 'published'
 			AND r.title ILIKE '%' || $1 || '%' ESCAPE '\'
 		ORDER BY r.likes_count DESC, r.created_at DESC
@@ -201,6 +203,7 @@ func (r *Repository) SearchReviews(ctx context.Context, q string, limit int) ([]
 		var poster *string
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.AuthorID, &item.Username, &item.PhotoURL,
+			&item.AvatarFrame, &item.Backdrop,
 			&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 			&item.Rating, &item.LikesCount, &item.ViewsCount,
 		); err != nil {

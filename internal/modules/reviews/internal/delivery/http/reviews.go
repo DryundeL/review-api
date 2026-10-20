@@ -73,6 +73,8 @@ type authorJSON struct {
 	Username    string `json:"username"`
 	PhotoURL    string `json:"photoUrl,omitempty"`
 	IsFollowing bool   `json:"isFollowing"`
+	AvatarFrame string `json:"avatarFrame,omitempty"`
+	Backdrop    string `json:"backdrop,omitempty"`
 }
 
 type mediaObjectJSON struct {
@@ -342,6 +344,7 @@ func reviewListItem(item ports.Review) reviewJSON {
 	return reviewJSON{
 		ID:            item.ID.String(),
 		AuthorID:      item.AuthorID.String(),
+		Author:        authorResponse(item.Author),
 		MediaObject:   mediaObjectResponse(item.MediaObject),
 		Title:         item.Title,
 		Rating:        item.Rating,
@@ -385,6 +388,8 @@ func authorResponse(a ports.AuthorRef) *authorJSON {
 		Username:    a.Username,
 		PhotoURL:    a.PhotoURL,
 		IsFollowing: a.IsFollowing,
+		AvatarFrame: a.AvatarFrame,
+		Backdrop:    a.Backdrop,
 	}
 }
 

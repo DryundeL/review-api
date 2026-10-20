@@ -17,11 +17,12 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
 	if admin == nil {
 		admin = denyUnauthorized
 	}
+	opt := optionalAuth(auth)
 
 	g.GET("/profile/reviews", h.ListMyReviews, auth)
-	g.GET("/profiles/:id/reviews", h.ListUserReviews)
+	g.GET("/profiles/:id/reviews", h.ListUserReviews, opt)
 
-	g.GET("/reviews", h.ListReviews)
+	g.GET("/reviews", h.ListReviews, opt)
 	g.GET("/reviews/:id", h.GetReview, auth)
 	g.POST("/reviews", h.CreateReview, auth)
 	g.PATCH("/reviews/:id", h.UpdateReview, auth)
@@ -34,6 +35,17 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
 	adminGroup.GET("", h.AdminList)
 	adminGroup.POST("", h.Create)
 	adminGroup.PATCH("/:code", h.Update)
+}
+
+func optionalAuth(auth echo.MiddlewareFunc) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if c.Request().Header.Get(echo.HeaderAuthorization) == "" {
+				return next(c)
+			}
+			return auth(next)(c)
+		}
+	}
 }
 
 func denyUnauthorized(next echo.HandlerFunc) echo.HandlerFunc {

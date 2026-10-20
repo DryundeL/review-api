@@ -66,6 +66,9 @@ func (r *Repository) List(ctx context.Context, p ports.ListParams) ([]ports.Item
 			r.likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			r.views_count,
+			(SELECT v.is_like FROM review_votes v WHERE v.review_id = r.id AND v.user_id = `)
+	b.WriteString(viewerArg)
+	b.WriteString(`) AS viewer_is_like,
 			r.created_at
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
@@ -162,6 +165,7 @@ func scanItem(row interface {
 		&item.Title, &item.Rating,
 		&item.HasSpoilers,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
+		&item.ViewerIsLike,
 		&item.CreatedAt,
 	)
 	if err != nil {

@@ -55,6 +55,7 @@ type AuthorRef struct {
 
 // Review is a read DTO for one review with counters.
 // Lists omit Blocks and set HasSpoilers; Get fills Blocks.
+// ViewerIsLike: true=like, false=dislike, nil=no vote / anonymous viewer.
 type Review struct {
 	ID            uuid.UUID
 	AuthorID      uuid.UUID
@@ -68,6 +69,7 @@ type Review struct {
 	LikesCount    int64
 	DislikesCount int64
 	ViewsCount    int64
+	ViewerIsLike  *bool
 }
 
 // Reason is one active report_reasons row for the public catalog.
@@ -106,8 +108,8 @@ type ReviewWriter interface {
 
 type ReviewReader interface {
 	Get(ctx context.Context, id, viewerID uuid.UUID) (Review, error)
-	ListByMedia(ctx context.Context, mediaObjectID uuid.UUID, limit int) ([]Review, error)
-	ListByAuthor(ctx context.Context, authorID uuid.UUID, publishedOnly bool, limit int) ([]Review, error)
+	ListByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID, limit int) ([]Review, error)
+	ListByAuthor(ctx context.Context, authorID, viewerID uuid.UUID, publishedOnly bool, limit int) ([]Review, error)
 }
 
 type Publisher interface {

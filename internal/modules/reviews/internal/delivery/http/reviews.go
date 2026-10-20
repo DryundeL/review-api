@@ -66,6 +66,7 @@ type reviewJSON struct {
 	LikesCount    int64            `json:"likesCount"`
 	DislikesCount int64            `json:"dislikesCount"`
 	ViewsCount    int64            `json:"viewsCount"`
+	ViewerIsLike  *bool            `json:"viewerIsLike,omitempty"`
 }
 
 type authorJSON struct {
@@ -164,7 +165,11 @@ func (h *Handler) ListReviews(c echo.Context) error {
 	if err != nil {
 		return mapReviewError(contract.FieldError{Field: "mediaObjectId"})
 	}
-	items, err := h.listReviews.Handle(c.Request().Context(), mediaID, parseLimit(c))
+	viewerID, err := h.optionalUser(c)
+	if err != nil {
+		return err
+	}
+	items, err := h.listReviews.Handle(c.Request().Context(), mediaID, viewerID, parseLimit(c))
 	if err != nil {
 		return mapReviewError(err)
 	}
@@ -176,7 +181,7 @@ func (h *Handler) ListMyReviews(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	items, err := h.listReviews.ByAuthor(c.Request().Context(), userID, false, parseLimit(c))
+	items, err := h.listReviews.ByAuthor(c.Request().Context(), userID, userID, false, parseLimit(c))
 	if err != nil {
 		return mapReviewError(err)
 	}
@@ -189,7 +194,11 @@ func (h *Handler) ListUserReviews(c echo.Context) error {
 	if err != nil {
 		return mapReviewError(contract.FieldError{Field: "authorId"})
 	}
-	items, err := h.listReviews.ByAuthor(c.Request().Context(), authorID, true, parseLimit(c))
+	viewerID, err := h.optionalUser(c)
+	if err != nil {
+		return err
+	}
+	items, err := h.listReviews.ByAuthor(c.Request().Context(), authorID, viewerID, true, parseLimit(c))
 	if err != nil {
 		return mapReviewError(err)
 	}
@@ -298,6 +307,19 @@ func (h *Handler) resolveUser(c echo.Context) (uuid.UUID, error) {
 	return userID, nil
 }
 
+// optionalUser returns viewer id when Bearer is present; uuid.Nil without auth.
+func (h *Handler) optionalUser(c echo.Context) (uuid.UUID, error) {
+	id, err := authcontract.IdentityFromContext(c.Request().Context())
+	if err != nil {
+		return uuid.Nil, nil
+	}
+	userID, err := h.users.UserID(c.Request().Context(), id.TelegramID)
+	if err != nil {
+		return uuid.Nil, httperr.Unauthorized("unauthorized")
+	}
+	return userID, nil
+}
+
 func parseReviewDraft(body reviewBody, requireMedia bool) (domain.Draft, error) {
 	var mediaID uuid.UUID
 	if requireMedia || body.MediaObjectID != "" {
@@ -353,6 +375,7 @@ func reviewListItem(item ports.Review) reviewJSON {
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,
+		ViewerIsLike:  item.ViewerIsLike,
 	}
 }
 
@@ -376,6 +399,7 @@ func reviewResponse(item ports.Review) reviewJSON {
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,
+		ViewerIsLike:  item.ViewerIsLike,
 	}
 }
 

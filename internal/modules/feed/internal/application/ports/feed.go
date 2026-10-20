@@ -35,6 +35,7 @@ type AuthorRef struct {
 }
 
 // Item is one published review in the feed (list shape, no blocks).
+// ViewerIsLike: true=like, false=dislike, nil=no vote / anonymous viewer.
 type Item struct {
 	ID            uuid.UUID
 	AuthorID      uuid.UUID
@@ -46,6 +47,7 @@ type Item struct {
 	LikesCount    int64
 	DislikesCount int64
 	ViewsCount    int64
+	ViewerIsLike  *bool
 	CreatedAt     time.Time
 }
 

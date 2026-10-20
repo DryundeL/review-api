@@ -40,6 +40,7 @@ type feedItemJSON struct {
 	LikesCount    int64            `json:"likesCount"`
 	DislikesCount int64            `json:"dislikesCount"`
 	ViewsCount    int64            `json:"viewsCount"`
+	ViewerIsLike  *bool            `json:"viewerIsLike,omitempty"`
 }
 
 type authorJSON struct {
@@ -140,6 +141,7 @@ func itemJSON(item ports.Item) feedItemJSON {
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,
+		ViewerIsLike:  item.ViewerIsLike,
 	}
 }
 

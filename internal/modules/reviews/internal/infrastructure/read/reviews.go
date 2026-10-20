@@ -51,7 +51,8 @@ func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (por
 			` + mediaObjectSelectSQL + `, r.title, r.rating, r.status,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
-			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
+			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count,
+			(SELECT v.is_like FROM review_votes v WHERE v.review_id = r.id AND v.user_id = $2) AS viewer_is_like
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
 		INNER JOIN users u ON u.id = r.author_id
@@ -74,7 +75,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (por
 	return item, nil
 }
 
-func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID uuid.UUID, limit int) ([]ports.Review, error) {
+func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID, limit int) ([]ports.Review, error) {
 	if mediaObjectID == uuid.Nil {
 		return nil, contract.FieldError{Field: "mediaObjectId"}
 	}
@@ -85,18 +86,19 @@ func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID uuid.U
 			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
-			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
+			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count,
+			(SELECT v.is_like FROM review_votes v WHERE v.review_id = r.id AND v.user_id = $2) AS viewer_is_like
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
 		INNER JOIN users u ON u.id = r.author_id
 		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.media_object_id = $1 AND r.status = 'published'
 		ORDER BY r.created_at DESC
-		LIMIT $2
-	`, mediaObjectID, limit)
+		LIMIT $3
+	`, mediaObjectID, viewerID, limit)
 }
 
-func (r *ReviewRepository) ListByAuthor(ctx context.Context, authorID uuid.UUID, publishedOnly bool, limit int) ([]ports.Review, error) {
+func (r *ReviewRepository) ListByAuthor(ctx context.Context, authorID, viewerID uuid.UUID, publishedOnly bool, limit int) ([]ports.Review, error) {
 	if authorID == uuid.Nil {
 		return nil, contract.FieldError{Field: "authorId"}
 	}
@@ -111,25 +113,26 @@ func (r *ReviewRepository) ListByAuthor(ctx context.Context, authorID uuid.UUID,
 			`+spoilersExistSQL+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
-			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count
+			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count,
+			(SELECT v.is_like FROM review_votes v WHERE v.review_id = r.id AND v.user_id = $2) AS viewer_is_like
 		FROM reviews r
 		INNER JOIN media_objects mo ON mo.id = r.media_object_id
 		INNER JOIN users u ON u.id = r.author_id
 		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.author_id = $1`+statusFilter+`
 		ORDER BY r.created_at DESC
-		LIMIT $2
-	`, authorID, limit)
+		LIMIT $3
+	`, authorID, viewerID, limit)
 }
 
-func (r *ReviewRepository) list(ctx context.Context, query string, filterID uuid.UUID, limit int) ([]ports.Review, error) {
+func (r *ReviewRepository) list(ctx context.Context, query string, filterID, viewerID uuid.UUID, limit int) ([]ports.Review, error) {
 	if r == nil || r.pool == nil {
 		return nil, contract.ErrInvalid
 	}
 	if limit <= 0 || limit > maxListLimit {
 		limit = 20
 	}
-	rows, err := r.pool.Query(ctx, query, filterID, limit)
+	rows, err := r.pool.Query(ctx, query, filterID, viewerID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list reviews: %w", err)
 	}
@@ -180,6 +183,7 @@ func scanReview(row pgx.Row) (ports.Review, error) {
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating, &item.Status,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
+		&item.ViewerIsLike,
 	)
 	if err != nil {
 		return ports.Review{}, err
@@ -201,6 +205,7 @@ func scanListReview(row pgx.Row) (ports.Review, error) {
 		&item.Title, &item.Rating, &item.Status,
 		&item.HasSpoilers,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
+		&item.ViewerIsLike,
 	)
 	if err != nil {
 		return ports.Review{}, err

@@ -41,16 +41,16 @@ func NewListReviewsHandler(repo ports.ReviewReader) *ListReviewsHandler {
 	return &ListReviewsHandler{repo: repo}
 }
 
-func (h *ListReviewsHandler) Handle(ctx context.Context, mediaObjectID uuid.UUID, limit int) ([]ports.Review, error) {
+func (h *ListReviewsHandler) Handle(ctx context.Context, mediaObjectID, viewerID uuid.UUID, limit int) ([]ports.Review, error) {
 	if h == nil || h.repo == nil {
 		return nil, contract.ErrInvalid
 	}
-	return h.repo.ListByMedia(ctx, mediaObjectID, limit)
+	return h.repo.ListByMedia(ctx, mediaObjectID, viewerID, limit)
 }
 
-func (h *ListReviewsHandler) ByAuthor(ctx context.Context, authorID uuid.UUID, publishedOnly bool, limit int) ([]ports.Review, error) {
+func (h *ListReviewsHandler) ByAuthor(ctx context.Context, authorID, viewerID uuid.UUID, publishedOnly bool, limit int) ([]ports.Review, error) {
 	if h == nil || h.repo == nil {
 		return nil, contract.ErrInvalid
 	}
-	return h.repo.ListByAuthor(ctx, authorID, publishedOnly, limit)
+	return h.repo.ListByAuthor(ctx, authorID, viewerID, publishedOnly, limit)
 }

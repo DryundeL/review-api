@@ -18,7 +18,7 @@
 
 | mode | Auth |
 |---|---|
-| `all` | опционален; с Bearer заполняется `author.isFollowing` |
+| `all` | опционален; с Bearer заполняются `author.isFollowing` и `viewerIsLike` |
 | `following` | `Authorization: Bearer <jwt>` обязателен, иначе `401` |
 
 ### Response `200`
@@ -50,7 +50,8 @@
       "hasSpoilers": false,
       "likesCount": 12,
       "dislikesCount": 1,
-      "viewsCount": 100
+      "viewsCount": 100,
+      "viewerIsLike": true
     }
   ],
   "nextCursor": "eyJzIjoibmV3Ii..."
@@ -59,6 +60,7 @@
 
 - `status` нет — только у своих обзоров на профиле (`/profile/reviews`).
 - `author.isFollowing` — подписан ли текущий юзер на автора. Без auth → всегда `false`. На свои посты → `false`.
+- `viewerIsLike` — голос текущего юзера: `true` лайк, `false` дизлайк; без голоса / без auth поле отсутствует.
 - `nextCursor`: `string` или `null`. Если `null` — конец ленты.
 - `author.username` — ник Telegram **без** `@`. Может быть `""`.
 - `author.photoUrl` — аватар Telegram CDN; может отсутствовать.

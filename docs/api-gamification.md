@@ -2,6 +2,8 @@
 
 Очки за активность, Steam-lite магазин косметики. Ассеты (картинки рамок/фонов) живут на фронте по текстовому `code`.
 
+Ачивки: [api-achievements.md](api-achievements.md) (`GET /v1/profiles/{id}/achievements`).
+
 ## Начисление очков
 
 | Событие | Кому | Формула | ENV |

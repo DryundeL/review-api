@@ -12,12 +12,19 @@ import (
 )
 
 type PurchaseHandler struct {
-	repo ports.WalletWriter
-	tx   transaction.Manager
+	repo    ports.WalletWriter
+	advance *AdvanceMetricHandler
+	tx      transaction.Manager
 }
 
 func NewPurchaseHandler(repo ports.WalletWriter, tx transaction.Manager) *PurchaseHandler {
 	return &PurchaseHandler{repo: repo, tx: tx}
+}
+
+func (h *PurchaseHandler) SetAdvance(advance *AdvanceMetricHandler) {
+	if h != nil {
+		h.advance = advance
+	}
 }
 
 func (h *PurchaseHandler) Handle(ctx context.Context, userID, itemID uuid.UUID) error {
@@ -32,6 +39,13 @@ func (h *PurchaseHandler) Handle(ctx context.Context, userID, itemID uuid.UUID) 
 	})
 	if err != nil {
 		return fmt.Errorf("purchase: %w", err)
+	}
+	if h.advance != nil {
+		if _, _, err := h.advance.Handle(
+			ctx, userID, "shop_purchases", 1, "ach:shop:"+userID.String()+":"+itemID.String(),
+		); err != nil {
+			return fmt.Errorf("purchase advance: %w", err)
+		}
 	}
 	return nil
 }

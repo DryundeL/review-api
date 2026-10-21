@@ -49,11 +49,16 @@ func (h *UpdateReviewHandler) Handle(ctx context.Context, reviewID, authorID uui
 			return err
 		}
 		if !wasPublished && item.Status == domain.StatusPublished {
+			mediaType, err := h.repo.MediaType(txCtx, item.MediaObjectID)
+			if err != nil {
+				return err
+			}
 			if err := h.publisher.Publish(txCtx, contract.EventPublished, item.ID.String(), map[string]string{
 				"id":            item.ID.String(),
 				"authorId":      item.AuthorID.String(),
 				"mediaObjectId": item.MediaObjectID.String(),
 				"blockCount":    strconv.Itoa(len(item.Blocks)),
+				"mediaType":     mediaType,
 			}); err != nil {
 				return err
 			}

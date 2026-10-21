@@ -11,12 +11,13 @@ import (
 )
 
 type FollowedHandler struct {
-	grant  *command.GrantPointsHandler
-	points PointsConfig
+	grant   *command.GrantPointsHandler
+	advance *command.AdvanceMetricHandler
+	points  PointsConfig
 }
 
-func NewFollowedHandler(grant *command.GrantPointsHandler, points PointsConfig) *FollowedHandler {
-	return &FollowedHandler{grant: grant, points: points}
+func NewFollowedHandler(grant *command.GrantPointsHandler, advance *command.AdvanceMetricHandler, points PointsConfig) *FollowedHandler {
+	return &FollowedHandler{grant: grant, advance: advance, points: points}
 }
 
 func (h *FollowedHandler) Handle(ctx context.Context, _ string, payload []byte) error {
@@ -38,11 +39,14 @@ func (h *FollowedHandler) Handle(ctx context.Context, _ string, payload []byte) 
 	if err != nil {
 		return nil
 	}
-	return h.grant.Handle(
-		ctx,
-		followeeID,
-		h.points.Follower,
-		"follower",
-		"follower:"+followerID.String()+":"+followeeID.String(),
-	)
+	key := followerID.String() + ":" + followeeID.String()
+	if err := h.grant.Handle(ctx, followeeID, h.points.Follower, "follower", "follower:"+key); err != nil {
+		return err
+	}
+	if h.advance != nil {
+		if _, _, err := h.advance.Handle(ctx, followeeID, "followers", 1, "ach:follow:"+key); err != nil {
+			return err
+		}
+	}
+	return nil
 }

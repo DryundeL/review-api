@@ -227,6 +227,136 @@ func (r *Repository) checkOwned(ctx context.Context, userID uuid.UUID, code *str
 	return nil
 }
 
+func (r *Repository) CreateAchievement(ctx context.Context, item domain.Achievement) error {
+	const q = `
+		INSERT INTO achievements (id, code, title, description, metric, target, reward_points, is_active, sort_order)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	if err := r.exec(ctx, q,
+		item.ID, item.Code, item.Title, item.Description, item.Metric,
+		item.Target, item.RewardPoints, item.IsActive, item.SortOrder,
+	); err != nil {
+		return mapWriteError(err)
+	}
+	return nil
+}
+
+func (r *Repository) UpdateAchievement(
+	ctx context.Context, id uuid.UUID,
+	title, description *string, target, reward, sortOrder *int, active *bool,
+) (ports.AchievementItem, error) {
+	const q = `
+		UPDATE achievements
+		SET title = COALESCE($2, title),
+			description = COALESCE($3, description),
+			target = COALESCE($4, target),
+			reward_points = COALESCE($5, reward_points),
+			sort_order = COALESCE($6, sort_order),
+			is_active = COALESCE($7, is_active),
+			updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, code, title, description, metric, target, reward_points, is_active, sort_order
+	`
+	var item ports.AchievementItem
+	err := r.queryRow(ctx, q, id, title, description, target, reward, sortOrder, active).Scan(
+		&item.ID, &item.Code, &item.Title, &item.Description, &item.Metric,
+		&item.Target, &item.RewardPoints, &item.IsActive, &item.SortOrder,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ports.AchievementItem{}, contract.ErrNotFound
+	}
+	if err != nil {
+		return ports.AchievementItem{}, mapWriteError(err)
+	}
+	return item, nil
+}
+
+func (r *Repository) NextAchievementSort(ctx context.Context) (int, error) {
+	const q = `SELECT COALESCE(MAX(sort_order), 0) + 10 FROM achievements`
+	var next int
+	if err := r.queryRow(ctx, q).Scan(&next); err != nil {
+		return 0, fmt.Errorf("next achievement sort: %w", err)
+	}
+	if next > maxSort {
+		return 0, contract.FieldError{Field: "sortOrder"}
+	}
+	return next, nil
+}
+
+func (r *Repository) RecordMetricEvent(ctx context.Context, userID uuid.UUID, metric string, delta int, sourceKey string) (bool, error) {
+	if userID == uuid.Nil || metric == "" || delta < 1 || sourceKey == "" {
+		return false, contract.ErrInvalid
+	}
+	const q = `
+		INSERT INTO achievement_metric_events (source_key, user_id, metric, delta)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (source_key) DO NOTHING
+	`
+	tag, err := r.execTag(ctx, q, sourceKey, userID, metric, delta)
+	if err != nil {
+		return false, mapWriteError(err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func (r *Repository) BumpMetric(ctx context.Context, userID uuid.UUID, metric string, delta int) (int, error) {
+	const q = `
+		INSERT INTO user_achievement_metrics (user_id, metric, value)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, metric) DO UPDATE
+		SET value = user_achievement_metrics.value + EXCLUDED.value,
+			updated_at = NOW()
+		RETURNING value
+	`
+	var value int
+	if err := r.queryRow(ctx, q, userID, metric, delta).Scan(&value); err != nil {
+		return 0, fmt.Errorf("bump achievement metric: %w", err)
+	}
+	return value, nil
+}
+
+func (r *Repository) ListUnlockable(ctx context.Context, userID uuid.UUID, metric string, value int) ([]ports.UnlockCandidate, error) {
+	const q = `
+		SELECT a.id, a.code, a.reward_points
+		FROM achievements a
+		WHERE a.is_active = TRUE
+		  AND a.metric = $2
+		  AND a.target <= $3
+		  AND NOT EXISTS (
+			SELECT 1 FROM user_achievements ua
+			WHERE ua.user_id = $1 AND ua.achievement_id = a.id
+		  )
+		ORDER BY a.target ASC, a.sort_order ASC
+	`
+	rows, err := r.query(ctx, q, userID, metric, value)
+	if err != nil {
+		return nil, fmt.Errorf("list unlockable: %w", err)
+	}
+	defer rows.Close()
+	out := make([]ports.UnlockCandidate, 0)
+	for rows.Next() {
+		var c ports.UnlockCandidate
+		if err := rows.Scan(&c.ID, &c.Code, &c.RewardPoints); err != nil {
+			return nil, fmt.Errorf("scan unlockable: %w", err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) UnlockAchievement(ctx context.Context, userID, achievementID uuid.UUID) (bool, error) {
+	const q = `
+		INSERT INTO user_achievements (user_id, achievement_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id, achievement_id) DO NOTHING
+	`
+	tag, err := r.execTag(ctx, q, userID, achievementID)
+	if err != nil {
+		return false, mapWriteError(err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 func (r *Repository) OwnsCode(ctx context.Context, userID uuid.UUID, code, kind string) (bool, error) {
 	const q = `
 		SELECT EXISTS (
@@ -273,6 +403,16 @@ func (r *Repository) queryRow(ctx context.Context, sql string, args ...any) pgx.
 		return tx.QueryRow(ctx, sql, args...)
 	}
 	return r.pool.QueryRow(ctx, sql, args...)
+}
+
+func (r *Repository) query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	if tx, ok := transaction.TxFromContext(ctx); ok {
+		return tx.Query(ctx, sql, args...)
+	}
+	if r == nil || r.pool == nil {
+		return nil, contract.ErrInvalid
+	}
+	return r.pool.Query(ctx, sql, args...)
 }
 
 func mapWriteError(err error) error {

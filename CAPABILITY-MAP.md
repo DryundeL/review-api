@@ -21,7 +21,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | social | BC | Подписки (`follows`) | users |
 | feed | BC | Read-side лента: курсор, фильтр типов, режимы `following` / `popular` | reviews, social, users |
 | search | BC | Read-side поиск: trends-табы (media / authors / types) + общий текстовый поиск (`@username`, название обзора, media object) | reviews, catalog, social, users |
-| gamification | BC | Очки + Steam-lite магазин косметики (`shop_items`, inventory, equipped keys). Consumers `review.published` / `review.voted` / `user.followed`. Unlock'и за типы — позже | reviews, users, social |
+| gamification | BC | Очки + Steam-lite магазин косметики (`shop_items`, inventory, equipped keys) + achievements (справочник, прогресс %, unlock + reward points). Consumers `review.published` / `review.voted` / `user.followed` | reviews, users, social |
 | notifications | BC | Пуши в Telegram. Скелет сразу, хендлеры после ядра | users, social, reviews |
 
 `cmd/bot` — процесс, не BC. `cmd/api`, `cmd/worker`, `cmd/migrator` — процессы.
@@ -40,11 +40,11 @@ platform → auth → users, media → catalog → reviews → social → feed, 
 |---|---|---|
 | `review.published` | reviews | feed, gamification, users (popularity), notifications |
 | `review.unpublished` | reviews | — (позже notifications; feed/search читают `status`) |
-| `review.voted` | reviews | feed, users, notifications |
+| `review.voted` | reviews | feed, users, notifications, gamification |
 | `review.viewed` | reviews | feed (батч, не каждый хит) |
-| `user.followed` | social | feed, notifications |
+| `user.followed` | social | feed, notifications, gamification |
 | `media_object.created` | catalog | — (аудит/поиск) |
-| `unlock.granted` | gamification | notifications, users — позже (unlock'и не в текущем срезе) |
+| `unlock.granted` | gamification | notifications, users — позже |
 
 Синхронно между BC — только `contract` (чтение, ACL). Side effects после write — только outbox в той же TX, что aggregate.
 
@@ -53,7 +53,7 @@ platform → auth → users, media → catalog → reviews → social → feed, 
 - Лента: два режима `following` и `popular`, фильтр типов в обоих. Курсор, page size 10.
 - `release_status` принадлежит `catalog` (произведение). Обзор предлагает обновление.
 - Без веб-скрапинга. Позже AniList/TMDB в то же поле.
-- Косметика профиля (фон / рамка / подложка списка) — через очки и магазин; unlock'и за типы обзоров — позже.
+- Косметика профиля (фон / рамка / подложка списка) — через очки и магазин; ачивки — прогресс по метрикам + unlock с очками (`docs/api-achievements.md`).
 - Один опубликованный обзор на пару `(user, media_object)`. Правка — PATCH.
 - `type` тайтла задаётся при импорте и не меняется через публичный API.
 - Типы MVP, стартовый набор `review_types`: `manga`, `manhwa`, `manhua`, `light_novel`, `comic`, `book`, `series`, `movie`, `dorama`, `anime_series`, `anime_movie`, `cartoon_series`, `cartoon_movie`, `game`. Код `light_novel` — ранобэ, как в клиенте. Админ может добавить тип. Статусы публикации и релиза не расширяются через API.
@@ -74,5 +74,5 @@ Kafka/NATS, скрапинг, комментарии, свободные тег�
 | SPEC-reviews.md | нет |
 | SPEC-social.md | нет |
 | SPEC-feed.md | нет |
-| SPEC-gamification.md | нет (срез: [docs/api-gamification.md](docs/api-gamification.md)) |
+| SPEC-gamification.md | нет (срез: [docs/api-gamification.md](docs/api-gamification.md), [docs/api-achievements.md](docs/api-achievements.md)) |
 | SPEC-notifications.md | нет |

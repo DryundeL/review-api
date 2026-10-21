@@ -99,6 +99,7 @@ type ReviewWriter interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	Get(ctx context.Context, id uuid.UUID) (domain.Review, error)
 	GetForUpdate(ctx context.Context, id uuid.UUID) (domain.Review, error)
+	MediaType(ctx context.Context, mediaObjectID uuid.UUID) (string, error)
 	UpsertVote(ctx context.Context, reviewID, userID uuid.UUID, isLike bool) error
 	InsertView(ctx context.Context, reviewID, userID uuid.UUID) (inserted bool, err error)
 	InsertReport(ctx context.Context, report Report) error

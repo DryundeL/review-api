@@ -57,6 +57,22 @@ func (r *ReviewRepository) Replace(ctx context.Context, item domain.Review) erro
 	return r.insertBlocks(ctx, item.ID, item.Blocks)
 }
 
+func (r *ReviewRepository) MediaType(ctx context.Context, mediaObjectID uuid.UUID) (string, error) {
+	if mediaObjectID == uuid.Nil {
+		return "", contract.FieldError{Field: "mediaObjectId"}
+	}
+	const q = `SELECT type FROM media_objects WHERE id = $1`
+	var mediaType string
+	err := r.queryRow(ctx, q, mediaObjectID).Scan(&mediaType)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", contract.FieldError{Field: "mediaObjectId"}
+	}
+	if err != nil {
+		return "", fmt.Errorf("media type: %w", err)
+	}
+	return mediaType, nil
+}
+
 func (r *ReviewRepository) Get(ctx context.Context, id uuid.UUID) (domain.Review, error) {
 	return r.get(ctx, id, false)
 }

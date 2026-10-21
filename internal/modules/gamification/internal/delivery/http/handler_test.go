@@ -50,6 +50,47 @@ func (m *memShop) ListItems(_ context.Context, activeOnly bool) ([]ports.ShopIte
 	return out, nil
 }
 
+type memAchievements struct {
+	items []ports.AchievementProgress
+}
+
+func (m *memAchievements) ListAchievements(context.Context, bool) ([]ports.AchievementItem, error) {
+	return nil, nil
+}
+
+func (m *memAchievements) ListProgress(_ context.Context, _ uuid.UUID) ([]ports.AchievementProgress, error) {
+	return m.items, nil
+}
+
+func TestListProfileAchievementsProgress(t *testing.T) {
+	t.Parallel()
+	unlocked := "2026-10-20T12:00:00Z"
+	reader := &memAchievements{items: []ports.AchievementProgress{{
+		AchievementItem: ports.AchievementItem{
+			Code: "first_review", Title: "First review", Description: "Publish your first review", Target: 1,
+		},
+		Current: 1, UnlockedAt: &unlocked,
+	}}}
+	h := NewHandler(HandlerDeps{
+		ListProgress: query.NewListProgressHandler(reader),
+	})
+	e := echo.New()
+	e.HTTPErrorHandler = httpserver.ErrorHandler
+	Register(e.Group("/v1"), h, nil, nil)
+
+	uid := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/v1/profiles/"+uid.String()+"/achievements", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"progress":100`) || !strings.Contains(body, `"unlockedAt":"2026-10-20T12:00:00Z"`) {
+		t.Fatalf("body %s", body)
+	}
+}
+
 func TestAdminCreateRequiresToken(t *testing.T) {
 	t.Parallel()
 	shop := &memShop{}

@@ -59,6 +59,7 @@ func (r *reportFakeRepo) GetForUpdate(context.Context, uuid.UUID) (domain.Review
 	}
 	return r.review, nil
 }
+func (r *reportFakeRepo) MediaType(context.Context, uuid.UUID) (string, error)         { return "manga", nil }
 func (r *reportFakeRepo) UpsertVote(context.Context, uuid.UUID, uuid.UUID, bool) error { return nil }
 func (r *reportFakeRepo) InsertView(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
 	return false, nil

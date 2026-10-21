@@ -23,29 +23,39 @@ type UserResolver interface {
 }
 
 type Handler struct {
-	list     *query.ListShopItemsHandler
-	create   *command.CreateShopItemHandler
-	update   *command.UpdateShopItemHandler
-	me       *query.GetMeHandler
-	purchase *command.PurchaseHandler
-	equip    *command.EquipHandler
-	users    UserResolver
+	list              *query.ListShopItemsHandler
+	create            *command.CreateShopItemHandler
+	update            *command.UpdateShopItemHandler
+	me                *query.GetMeHandler
+	purchase          *command.PurchaseHandler
+	equip             *command.EquipHandler
+	listAchievements  *query.ListAchievementsHandler
+	listProgress      *query.ListProgressHandler
+	createAchievement *command.CreateAchievementHandler
+	updateAchievement *command.UpdateAchievementHandler
+	users             UserResolver
 }
 
 type HandlerDeps struct {
-	List     *query.ListShopItemsHandler
-	Create   *command.CreateShopItemHandler
-	Update   *command.UpdateShopItemHandler
-	Me       *query.GetMeHandler
-	Purchase *command.PurchaseHandler
-	Equip    *command.EquipHandler
-	Users    UserResolver
+	List              *query.ListShopItemsHandler
+	Create            *command.CreateShopItemHandler
+	Update            *command.UpdateShopItemHandler
+	Me                *query.GetMeHandler
+	Purchase          *command.PurchaseHandler
+	Equip             *command.EquipHandler
+	ListAchievements  *query.ListAchievementsHandler
+	ListProgress      *query.ListProgressHandler
+	CreateAchievement *command.CreateAchievementHandler
+	UpdateAchievement *command.UpdateAchievementHandler
+	Users             UserResolver
 }
 
 func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
 		list: deps.List, create: deps.Create, update: deps.Update,
 		me: deps.Me, purchase: deps.Purchase, equip: deps.Equip, users: deps.Users,
+		listAchievements: deps.ListAchievements, listProgress: deps.ListProgress,
+		createAchievement: deps.CreateAchievement, updateAchievement: deps.UpdateAchievement,
 	}
 }
 
@@ -103,6 +113,77 @@ func (h *Handler) UpdateItem(c echo.Context) error {
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	return c.JSON(http.StatusOK, adminItem(item))
+}
+
+func (h *Handler) ListProfileAchievements(c echo.Context) error {
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil || userID == uuid.Nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "not found")
+	}
+	if h.listProgress == nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "not found")
+	}
+	items, err := h.listProgress.Handle(c.Request().Context(), userID)
+	if err != nil {
+		return mapError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, achievementsListResponse{Achievements: progressItems(items)})
+}
+
+func (h *Handler) AdminListAchievements(c echo.Context) error {
+	if h.listAchievements == nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "not found")
+	}
+	items, err := h.listAchievements.Handle(c.Request().Context(), false)
+	if err != nil {
+		return mapError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, adminAchievementsResponse{Achievements: adminAchievementItems(items)})
+}
+
+func (h *Handler) CreateAchievement(c echo.Context) error {
+	if h.createAchievement == nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "not found")
+	}
+	var body createAchievementBody
+	if err := c.Bind(&body); err != nil {
+		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	}
+	item, err := h.createAchievement.Handle(
+		c.Request().Context(),
+		body.Code, body.Title, body.Description, body.Metric,
+		body.Target, body.RewardPoints, body.SortOrder, body.IsActive,
+	)
+	if err != nil {
+		return mapError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusCreated, adminAchievementItem(item))
+}
+
+func (h *Handler) UpdateAchievement(c echo.Context) error {
+	if h.updateAchievement == nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "not found")
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil || id == uuid.Nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "not found")
+	}
+	var body updateAchievementBody
+	if err := c.Bind(&body); err != nil {
+		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	}
+	item, err := h.updateAchievement.Handle(
+		c.Request().Context(), id,
+		body.Title, body.Description, body.Target, body.RewardPoints, body.SortOrder, body.IsActive,
+	)
+	if err != nil {
+		return mapError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, adminAchievementItem(item))
 }
 
 func (h *Handler) Me(c echo.Context) error {
@@ -242,6 +323,56 @@ type purchaseBody struct {
 	ItemID string `json:"itemId"`
 }
 
+type createAchievementBody struct {
+	Code         string `json:"code"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Metric       string `json:"metric"`
+	Target       int    `json:"target"`
+	RewardPoints int    `json:"rewardPoints"`
+	SortOrder    *int   `json:"sortOrder"`
+	IsActive     *bool  `json:"isActive"`
+}
+
+type updateAchievementBody struct {
+	Title        *string `json:"title"`
+	Description  *string `json:"description"`
+	Target       *int    `json:"target"`
+	RewardPoints *int    `json:"rewardPoints"`
+	SortOrder    *int    `json:"sortOrder"`
+	IsActive     *bool   `json:"isActive"`
+}
+
+type achievementResponse struct {
+	Code        string  `json:"code"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Progress    int     `json:"progress"`
+	Current     int     `json:"current"`
+	Target      int     `json:"target"`
+	UnlockedAt  *string `json:"unlockedAt,omitempty"`
+}
+
+type achievementsListResponse struct {
+	Achievements []achievementResponse `json:"achievements"`
+}
+
+type adminAchievementResponse struct {
+	ID           string `json:"id"`
+	Code         string `json:"code"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Metric       string `json:"metric"`
+	Target       int    `json:"target"`
+	RewardPoints int    `json:"rewardPoints"`
+	SortOrder    int    `json:"sortOrder"`
+	IsActive     bool   `json:"isActive"`
+}
+
+type adminAchievementsResponse struct {
+	Achievements []adminAchievementResponse `json:"achievements"`
+}
+
 type itemResponse struct {
 	ID        string `json:"id"`
 	Code      string `json:"code"`
@@ -312,6 +443,34 @@ func equippedJSON(p ports.Profile) equippedResponse {
 		Background:  p.EquippedBackground,
 		AvatarFrame: p.EquippedAvatarFrame,
 		Backdrop:    p.EquippedBackdrop,
+	}
+}
+
+func progressItems(items []ports.AchievementProgress) []achievementResponse {
+	out := make([]achievementResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, achievementResponse{
+			Code: item.Code, Title: item.Title, Description: item.Description,
+			Progress: query.ProgressPercent(item.Current, item.Target),
+			Current:  item.Current, Target: item.Target, UnlockedAt: item.UnlockedAt,
+		})
+	}
+	return out
+}
+
+func adminAchievementItems(items []ports.AchievementItem) []adminAchievementResponse {
+	out := make([]adminAchievementResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, adminAchievementItem(item))
+	}
+	return out
+}
+
+func adminAchievementItem(item ports.AchievementItem) adminAchievementResponse {
+	return adminAchievementResponse{
+		ID: item.ID.String(), Code: item.Code, Title: item.Title, Description: item.Description,
+		Metric: item.Metric, Target: item.Target, RewardPoints: item.RewardPoints,
+		SortOrder: item.SortOrder, IsActive: item.IsActive,
 	}
 }
 

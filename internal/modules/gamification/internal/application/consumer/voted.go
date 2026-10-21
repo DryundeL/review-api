@@ -17,12 +17,18 @@ type ReviewLookup interface {
 
 type VotedHandler struct {
 	grant   *command.GrantPointsHandler
+	advance *command.AdvanceMetricHandler
 	reviews ReviewLookup
 	points  PointsConfig
 }
 
-func NewVotedHandler(grant *command.GrantPointsHandler, reviews ReviewLookup, points PointsConfig) *VotedHandler {
-	return &VotedHandler{grant: grant, reviews: reviews, points: points}
+func NewVotedHandler(
+	grant *command.GrantPointsHandler,
+	advance *command.AdvanceMetricHandler,
+	reviews ReviewLookup,
+	points PointsConfig,
+) *VotedHandler {
+	return &VotedHandler{grant: grant, advance: advance, reviews: reviews, points: points}
 }
 
 func (h *VotedHandler) Handle(ctx context.Context, _ string, payload []byte) error {
@@ -63,6 +69,14 @@ func (h *VotedHandler) Handle(ctx context.Context, _ string, payload []byte) err
 	}
 	if h.points.LikeReceived > 0 {
 		if err := h.grant.Handle(ctx, ref.AuthorID, h.points.LikeReceived, "like_received", "like_received:"+keyBase); err != nil {
+			return err
+		}
+	}
+	if h.advance != nil {
+		if _, _, err := h.advance.Handle(ctx, actorID, "likes_given", 1, "ach:like_given:"+keyBase); err != nil {
+			return err
+		}
+		if _, _, err := h.advance.Handle(ctx, ref.AuthorID, "likes_received", 1, "ach:like_recv:"+keyBase); err != nil {
 			return err
 		}
 	}

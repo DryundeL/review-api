@@ -12,12 +12,19 @@ import (
 )
 
 type GrantPointsHandler struct {
-	repo ports.WalletWriter
-	tx   transaction.Manager
+	repo    ports.WalletWriter
+	advance *AdvanceMetricHandler
+	tx      transaction.Manager
 }
 
 func NewGrantPointsHandler(repo ports.WalletWriter, tx transaction.Manager) *GrantPointsHandler {
 	return &GrantPointsHandler{repo: repo, tx: tx}
+}
+
+func (h *GrantPointsHandler) SetAdvance(advance *AdvanceMetricHandler) {
+	if h != nil {
+		h.advance = advance
+	}
 }
 
 func (h *GrantPointsHandler) Handle(ctx context.Context, userID uuid.UUID, amount int, reason, sourceKey string) error {
@@ -27,12 +34,22 @@ func (h *GrantPointsHandler) Handle(ctx context.Context, userID uuid.UUID, amoun
 	if userID == uuid.Nil || amount < 1 || reason == "" || sourceKey == "" {
 		return contract.ErrInvalid
 	}
+	var applied bool
 	err := h.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
-		_, err := h.repo.GrantPoints(txCtx, userID, amount, reason, sourceKey)
-		return err
+		ok, err := h.repo.GrantPoints(txCtx, userID, amount, reason, sourceKey)
+		if err != nil {
+			return err
+		}
+		applied = ok
+		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("grant points: %w", err)
+	}
+	if applied && reason != ReasonAchievement && h.advance != nil {
+		if _, _, err := h.advance.Handle(ctx, userID, "points_earned", amount, "ach:pts:"+sourceKey); err != nil {
+			return fmt.Errorf("grant points advance: %w", err)
+		}
 	}
 	return nil
 }

@@ -42,7 +42,8 @@ Auth: **Bearer обязателен**.
   "isMe": true,
   "telegramId": 42,
   "languageCode": "ru",
-  "isPremium": false
+  "isPremium": false,
+  "email": "user@example.com"
 }
 ```
 
@@ -73,6 +74,7 @@ Auth: **опционален**. Если есть Bearer и `{userId}` = я → 
 | `followingCount` | на скольких подписан |
 | `isFollowing` | подписан ли **текущий** юзер на этого (без auth / на себя → `false`) |
 | `isMe` | это мой профиль |
+| `email` | только свой профиль; нет поля — почта не привязана. Привязка и вход: [api-email.md](api-email.md) |
 
 **404** — нет юзера / битый uuid.
 

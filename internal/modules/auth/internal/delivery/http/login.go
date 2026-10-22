@@ -11,6 +11,7 @@ import (
 
 	"review-api/internal/http/httperr"
 	"review-api/internal/modules/auth/contract"
+	"review-api/internal/modules/auth/internal/application"
 	"review-api/internal/modules/auth/internal/domain"
 )
 
@@ -94,6 +95,50 @@ func (h *Handler) PollLogin(c echo.Context) error {
 	return c.JSON(http.StatusOK, pollLoginResponse{Status: status, Token: token})
 }
 
+func (h *Handler) StartEmailLogin(c echo.Context) error {
+	if h.email == nil {
+		return errors.New("email login unavailable")
+	}
+	var req emailLoginRequest
+	dec := json.NewDecoder(http.MaxBytesReader(c.Response().Writer, c.Request().Body, 1024))
+	if err := dec.Decode(&req); err != nil {
+		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	}
+	err := h.email.Start(c.Request().Context(), req.Email)
+	switch {
+	case errors.Is(err, application.ErrEmailCooldown):
+		return httperr.New(http.StatusTooManyRequests, "RATE_LIMITED", "verification code recently sent")
+	case errors.Is(err, contract.ErrInvalidEmail):
+		return httperr.New(http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid email")
+	case errors.Is(err, application.ErrEmailUnavailable):
+		return httperr.New(http.StatusServiceUnavailable, "EMAIL_UNAVAILABLE", "email delivery unavailable")
+	case err != nil:
+		return err
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusAccepted, map[string]int{"expiresIn": 600})
+}
+
+func (h *Handler) ConfirmEmailLogin(c echo.Context) error {
+	if h.email == nil {
+		return errors.New("email login unavailable")
+	}
+	var req emailConfirmRequest
+	dec := json.NewDecoder(http.MaxBytesReader(c.Response().Writer, c.Request().Body, 1024))
+	if err := dec.Decode(&req); err != nil {
+		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	}
+	token, err := h.email.Confirm(c.Request().Context(), req.Email, req.Code)
+	if errors.Is(err, application.ErrEmailCodeInvalid) {
+		return httperr.Unauthorized("invalid verification code")
+	}
+	if err != nil {
+		return err
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, telegramResponse{Token: token})
+}
+
 func bearerToken(header string) (string, bool) {
 	scheme, token, ok := strings.Cut(header, " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") {
@@ -118,6 +163,15 @@ type startLoginResponse struct {
 
 type pollLoginRequest struct {
 	LoginID string `json:"loginId"`
+}
+
+type emailLoginRequest struct {
+	Email string `json:"email"`
+}
+
+type emailConfirmRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
 }
 
 type pollLoginResponse struct {

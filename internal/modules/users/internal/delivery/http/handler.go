@@ -2,6 +2,7 @@ package usershttp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -29,6 +30,7 @@ type Handler struct {
 	profile   *query.GetProfileHandler
 	settings  *query.GetSettingsHandler
 	update    *command.UpdateSettingsHandler
+	email     *command.EmailHandler
 	users     UserResolver
 	cosmetics CosmeticsLookup
 }
@@ -41,6 +43,10 @@ func NewHandler(
 	cosmetics CosmeticsLookup,
 ) *Handler {
 	return &Handler{profile: profile, settings: settings, update: update, users: users, cosmetics: cosmetics}
+}
+
+func (h *Handler) SetEmailHandler(email *command.EmailHandler) {
+	h.email = email
 }
 
 func (h *Handler) Profile(c echo.Context) error {
@@ -114,6 +120,61 @@ func (h *Handler) PatchSettings(c echo.Context) error {
 	return c.JSON(http.StatusOK, settingsJSON(s))
 }
 
+func (h *Handler) StartEmail(c echo.Context) error {
+	id, err := authcontract.IdentityFromContext(c.Request().Context())
+	if err != nil {
+		return httperr.Unauthorized("unauthorized")
+	}
+	var body struct {
+		Email string `json:"email"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Response().Writer, c.Request().Body, 1024))
+	if err := decoder.Decode(&body); err != nil {
+		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	}
+	current, err := h.email.Start(c.Request().Context(), id.TelegramID, body.Email)
+	switch {
+	case errors.As(err, new(contract.FieldError)):
+		return httperr.New(http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid email")
+	case errors.Is(err, contract.ErrEmailConflict):
+		return httperr.New(http.StatusConflict, "EMAIL_CONFLICT", "email already in use")
+	case errors.Is(err, command.ErrCooldown):
+		return httperr.New(http.StatusTooManyRequests, "RATE_LIMITED", "verification code recently sent")
+	case errors.Is(err, command.ErrEmailUnavailable):
+		return httperr.New(http.StatusServiceUnavailable, "EMAIL_UNAVAILABLE", "email delivery unavailable")
+	case err != nil:
+		return err
+	case current:
+		return c.NoContent(http.StatusOK)
+	default:
+		return c.JSON(http.StatusAccepted, map[string]int{"expiresIn": 600})
+	}
+}
+
+func (h *Handler) ConfirmEmail(c echo.Context) error {
+	id, err := authcontract.IdentityFromContext(c.Request().Context())
+	if err != nil {
+		return httperr.Unauthorized("unauthorized")
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Response().Writer, c.Request().Body, 1024))
+	if err := decoder.Decode(&body); err != nil {
+		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	}
+	err = h.email.Confirm(c.Request().Context(), id.TelegramID, body.Code)
+	switch {
+	case errors.Is(err, command.ErrCodeInvalid):
+		return httperr.Unauthorized("invalid verification code")
+	case errors.Is(err, contract.ErrEmailConflict):
+		return httperr.New(http.StatusConflict, "EMAIL_CONFLICT", "email already in use")
+	case err != nil:
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *Handler) requireUser(c echo.Context) (uuid.UUID, error) {
 	id, err := authcontract.IdentityFromContext(c.Request().Context())
 	if err != nil {
@@ -157,6 +218,7 @@ type profileResponse struct {
 	TelegramID     *int64 `json:"telegramId,omitempty"`
 	LanguageCode   string `json:"languageCode,omitempty"`
 	IsPremium      *bool  `json:"isPremium,omitempty"`
+	Email          string `json:"email,omitempty"`
 	Background     string `json:"background,omitempty"`
 	AvatarFrame    string `json:"avatarFrame,omitempty"`
 	Backdrop       string `json:"backdrop,omitempty"`
@@ -190,6 +252,7 @@ func (h *Handler) profileJSON(ctx context.Context, card query.Card, includePriva
 		out.TelegramID = &tid
 		out.LanguageCode = card.User.LanguageCode
 		out.IsPremium = &prem
+		out.Email = card.User.Email
 	}
 	if h.cosmetics != nil {
 		if cos, err := h.cosmetics.Cosmetics(ctx, card.User.ID); err == nil {

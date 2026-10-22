@@ -185,6 +185,39 @@ func (r *Repository) UpdateSettings(ctx context.Context, userID uuid.UUID, langu
 	return s, nil
 }
 
+func (r *Repository) SetEmail(ctx context.Context, telegramID int64, email string) error {
+	if r == nil || r.pool == nil || telegramID <= 0 || email == "" {
+		return contract.ErrNotFound
+	}
+	tag, err := r.execTag(ctx, `UPDATE users SET email = $2, updated_at = NOW() WHERE telegram_id = $1`, telegramID, email)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return contract.ErrEmailConflict
+	}
+	if err != nil {
+		return fmt.Errorf("set user email: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return contract.ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) FindTelegramIDByEmail(ctx context.Context, email string) (int64, error) {
+	if r == nil || r.pool == nil || email == "" {
+		return 0, contract.ErrNotFound
+	}
+	var telegramID int64
+	err := r.queryRow(ctx, `SELECT telegram_id FROM users WHERE email = $1`, email).Scan(&telegramID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, contract.ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("find user by email: %w", err)
+	}
+	return telegramID, nil
+}
+
 func nullString(value string) any {
 	if value == "" {
 		return nil

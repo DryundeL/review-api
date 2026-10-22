@@ -2,10 +2,12 @@ package users
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
+	"github.com/redis/go-redis/v9"
 
 	authcontract "review-api/internal/modules/auth/contract"
 	gamificationcontract "review-api/internal/modules/gamification/contract"
@@ -14,8 +16,10 @@ import (
 	"review-api/internal/modules/users/internal/application/ports"
 	"review-api/internal/modules/users/internal/application/query"
 	usershttp "review-api/internal/modules/users/internal/delivery/http"
+	"review-api/internal/modules/users/internal/domain"
 	"review-api/internal/modules/users/internal/infrastructure/read"
 	"review-api/internal/modules/users/internal/infrastructure/write"
+	"review-api/internal/platform/authcode"
 )
 
 type CosmeticsLookup interface {
@@ -23,8 +27,11 @@ type CosmeticsLookup interface {
 }
 
 type Dependencies struct {
-	Pool *pgxpool.Pool
-	Auth echo.MiddlewareFunc
+	Pool        *pgxpool.Pool
+	Auth        echo.MiddlewareFunc
+	Redis       *redis.Client
+	AuthSecret  string
+	EmailSender command.EmailSender
 }
 
 type Module struct {
@@ -32,6 +39,8 @@ type Module struct {
 	profile        *query.GetProfileHandler
 	getSettings    *query.GetSettingsHandler
 	updateSettings *command.UpdateSettingsHandler
+	email          *command.EmailHandler
+	emailRepo      ports.EmailRepository
 	prefs          ports.UserRepository
 	cosmetics      CosmeticsLookup
 	auth           echo.MiddlewareFunc
@@ -39,11 +48,14 @@ type Module struct {
 
 func New(deps Dependencies) *Module {
 	writeRepo := write.NewRepository(deps.Pool)
+	codes := &challengeAdapter{store: authcode.New(deps.Redis, []byte(deps.AuthSecret), "users:email")}
 	return &Module{
 		ensure:         command.NewEnsureUserHandler(writeRepo, nil),
 		profile:        query.NewGetProfileHandler(read.NewRepository(deps.Pool)),
 		getSettings:    query.NewGetSettingsHandler(writeRepo),
 		updateSettings: command.NewUpdateSettingsHandler(writeRepo),
+		email:          command.NewEmailHandler(writeRepo, codes, deps.EmailSender),
+		emailRepo:      writeRepo,
 		prefs:          writeRepo,
 		auth:           deps.Auth,
 	}
@@ -117,10 +129,55 @@ func (m *Module) SetAuth(auth echo.MiddlewareFunc) {
 	m.auth = auth
 }
 
+func (m *Module) FindTelegramIDByEmail(ctx context.Context, rawEmail string) (int64, error) {
+	email, err := domain.NormalizeEmail(rawEmail)
+	if err != nil {
+		return 0, err
+	}
+	return m.emailRepo.FindTelegramIDByEmail(ctx, email)
+}
+
+func (m *Module) ResolveLoginEmail(ctx context.Context, rawEmail string) (string, int64, bool, error) {
+	email, err := domain.NormalizeEmail(rawEmail)
+	if err != nil {
+		return "", 0, false, err
+	}
+	telegramID, err := m.emailRepo.FindTelegramIDByEmail(ctx, email)
+	if errors.Is(err, contract.ErrNotFound) {
+		return email, 0, false, nil
+	}
+	if err != nil {
+		return "", 0, false, err
+	}
+	return email, telegramID, true, nil
+}
+
 func (m *Module) SetCosmetics(c CosmeticsLookup) {
 	m.cosmetics = c
 }
 
 func (m *Module) RegisterHTTP(g *echo.Group) {
-	usershttp.Register(g, usershttp.NewHandler(m.profile, m.getSettings, m.updateSettings, m, m.cosmetics), m.auth)
+	handler := usershttp.NewHandler(m.profile, m.getSettings, m.updateSettings, m, m.cosmetics)
+	handler.SetEmailHandler(m.email)
+	usershttp.Register(g, handler, m.auth)
+}
+
+type challengeAdapter struct {
+	store *authcode.Store
+}
+
+func (a *challengeAdapter) Issue(ctx context.Context, subject, email string) (string, error) {
+	code, err := a.store.Issue(ctx, subject, email)
+	if errors.Is(err, authcode.ErrCooldown) {
+		return "", command.ErrCooldown
+	}
+	return code, err
+}
+
+func (a *challengeAdapter) Verify(ctx context.Context, subject, code string) (string, error) {
+	return a.store.Verify(ctx, subject, code)
+}
+
+func (a *challengeAdapter) Cancel(ctx context.Context, subject string) {
+	a.store.Cancel(ctx, subject)
 }

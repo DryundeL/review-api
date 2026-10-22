@@ -8,6 +8,7 @@ var (
 	ErrInvalidProfile = errors.New("invalid telegram profile")
 	ErrNotFound       = errors.New("user not found")
 	ErrInvalid        = errors.New("invalid")
+	ErrEmailConflict  = errors.New("email already in use")
 )
 
 // FieldError names the rejected field. The field is a fixed token, never raw input.

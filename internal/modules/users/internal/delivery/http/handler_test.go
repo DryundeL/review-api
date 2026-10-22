@@ -67,7 +67,7 @@ func TestProfile(t *testing.T) {
 	h := NewHandler(query.NewGetProfileHandler(stubProfiles{
 		user: domain.User{
 			ID: uid, TelegramID: 42, Username: "ann", FirstName: "Ann",
-			PhotoURL: "https://t.me/i/userpic/320/ann.jpg",
+			PhotoURL: "https://t.me/i/userpic/320/ann.jpg", Email: "ann@example.com",
 		},
 		followers: 3, following: 1,
 	}), nil, nil, stubUsers{id: uid}, nil)
@@ -97,6 +97,9 @@ func TestProfile(t *testing.T) {
 	if body.PhotoURL != "https://t.me/i/userpic/320/ann.jpg" {
 		t.Fatalf("photoUrl = %q", body.PhotoURL)
 	}
+	if body.Email != "ann@example.com" {
+		t.Fatalf("email = %q", body.Email)
+	}
 }
 
 func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
@@ -104,7 +107,7 @@ func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
 	target := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	viewer := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	h := NewHandler(query.NewGetProfileHandler(stubProfiles{
-		user:      domain.User{ID: target, TelegramID: 42, Username: "ann", FirstName: "Ann"},
+		user:      domain.User{ID: target, TelegramID: 42, Username: "ann", FirstName: "Ann", Email: "ann@example.com"},
 		followers: 2, isFollowing: true,
 	}), nil, nil, stubUsers{id: viewer}, nil)
 	e := echo.New()
@@ -127,7 +130,7 @@ func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.IsMe || !body.IsFollowing || body.FollowersCount != 2 || body.TelegramID != nil {
+	if body.IsMe || !body.IsFollowing || body.FollowersCount != 2 || body.TelegramID != nil || body.Email != "" {
 		t.Fatalf("other body = %+v", body)
 	}
 

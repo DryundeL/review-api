@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -12,15 +13,22 @@ import (
 	authhttp "review-api/internal/modules/auth/internal/delivery/http"
 	"review-api/internal/modules/auth/internal/domain"
 	"review-api/internal/modules/auth/internal/infrastructure/login"
+	"review-api/internal/platform/authcode"
 )
 
 type Dependencies struct {
-	BotToken    string
-	MaxAge      time.Duration
-	Redis       *redis.Client
-	JWTSecret   string
-	BotUsername string
-	EnsureUser  func(context.Context, contract.TelegramIdentity) error
+	BotToken      string
+	MaxAge        time.Duration
+	Redis         *redis.Client
+	JWTSecret     string
+	BotUsername   string
+	EnsureUser    func(context.Context, contract.TelegramIdentity) error
+	EmailResolver EmailResolver
+	EmailSender   application.EmailSender
+}
+
+type EmailResolver interface {
+	ResolveLoginEmail(ctx context.Context, raw string) (normalized string, telegramID int64, found bool, err error)
 }
 
 type Middlewares struct {
@@ -42,11 +50,33 @@ func NewModule(deps Dependencies) *Module {
 		svc = application.NewLoginService(login.NewStore(deps.Redis), []byte(deps.JWTSecret), deps.BotUsername, deps.MaxAge)
 	}
 	h := authhttp.NewHandler(validate, svc, []byte(deps.JWTSecret), deps.MaxAge, deps.EnsureUser)
+	emailCodes := &emailChallengeAdapter{store: authcode.New(deps.Redis, []byte(deps.JWTSecret), "auth:email")}
+	h.SetEmailLogin(application.NewEmailLoginService(deps.EmailResolver, emailCodes, deps.EmailSender, []byte(deps.JWTSecret), deps.MaxAge))
 	return &Module{
 		Middlewares: Middlewares{Auth: h.Middleware, Bearer: h.Bearer},
 		handler:     h,
 		login:       svc,
 	}
+}
+
+type emailChallengeAdapter struct {
+	store *authcode.Store
+}
+
+func (a *emailChallengeAdapter) Issue(ctx context.Context, subject, value string) (string, error) {
+	code, err := a.store.Issue(ctx, subject, value)
+	if errors.Is(err, authcode.ErrCooldown) {
+		return "", application.ErrEmailCooldown
+	}
+	return code, err
+}
+
+func (a *emailChallengeAdapter) Verify(ctx context.Context, subject, code string) (string, error) {
+	return a.store.Verify(ctx, subject, code)
+}
+
+func (a *emailChallengeAdapter) Cancel(ctx context.Context, subject string) {
+	a.store.Cancel(ctx, subject)
 }
 
 func New(deps Dependencies) *Module {

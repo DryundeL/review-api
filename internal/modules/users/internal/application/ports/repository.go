@@ -18,6 +18,11 @@ type UserRepository interface {
 	UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, allow *bool) (domain.Settings, error)
 }
 
+type EmailRepository interface {
+	SetEmail(ctx context.Context, telegramID int64, email string) error
+	FindTelegramIDByEmail(ctx context.Context, email string) (int64, error)
+}
+
 // ProfileCard is a user row plus follow stats for profile screens.
 type ProfileCard struct {
 	User           domain.User

@@ -73,6 +73,11 @@ type AppConfig struct {
 	PointsLikeGiven      int
 	PointsLikeReceived   int
 	PointsFollower       int
+	SMTPHost             string
+	SMTPPort             int
+	SMTPUser             string
+	SMTPPassword         string
+	SMTPFrom             string
 }
 
 func Load() (*Config, error) {
@@ -120,6 +125,10 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	smtpPort, err := atoiDefault("SMTP_PORT", 587)
+	if err != nil {
+		return nil, err
+	}
 	cfg := &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -158,6 +167,11 @@ func Load() (*Config, error) {
 			PointsLikeGiven:      pointsLikeGiven,
 			PointsLikeReceived:   pointsLikeReceived,
 			PointsFollower:       pointsFollower,
+			SMTPHost:             os.Getenv("SMTP_HOST"),
+			SMTPPort:             smtpPort,
+			SMTPUser:             os.Getenv("SMTP_USER"),
+			SMTPPassword:         os.Getenv("SMTP_PASSWORD"),
+			SMTPFrom:             os.Getenv("SMTP_FROM"),
 		},
 	}
 
@@ -197,6 +211,9 @@ func (c *Config) Validate() error {
 	}
 	if c.App.ReportHideThreshold < 1 {
 		return fmt.Errorf("REPORT_HIDE_THRESHOLD must be >= 1")
+	}
+	if c.App.SMTPHost != "" && (c.App.SMTPPort < 1 || c.App.SMTPPort > 65535 || c.App.SMTPFrom == "") {
+		return fmt.Errorf("SMTP_PORT and SMTP_FROM are required when SMTP_HOST is set")
 	}
 	switch c.App.Env {
 	case "development", "staging", "production":

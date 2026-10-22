@@ -29,6 +29,7 @@ type User struct {
 	LanguageCode string
 	IsPremium    bool
 	PhotoURL     string
+	Email        string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

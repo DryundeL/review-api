@@ -6,5 +6,7 @@ func RegisterRoutes(g *echo.Group, h *Handler) {
 	g.POST("/auth/telegram", h.Telegram)
 	g.POST("/auth/login", h.StartLogin)
 	g.POST("/auth/login/poll", h.PollLogin)
+	g.POST("/auth/email", h.StartEmailLogin)
+	g.POST("/auth/email/confirm", h.ConfirmEmailLogin)
 	g.GET("/auth/identity", h.Identity, h.Middleware)
 }

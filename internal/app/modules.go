@@ -22,6 +22,7 @@ import (
 	userscontract "review-api/internal/modules/users/contract"
 	"review-api/internal/platform/config"
 	"review-api/internal/platform/httpserver"
+	mailx "review-api/internal/platform/mail"
 )
 
 type Modules struct {
@@ -37,7 +38,13 @@ type Modules struct {
 }
 
 func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modules {
-	usersMod := users.New(users.Dependencies{Pool: pool})
+	emailSender := mailx.New(mailx.Config{
+		Host: cfg.App.SMTPHost, Port: cfg.App.SMTPPort, User: cfg.App.SMTPUser,
+		Password: cfg.App.SMTPPassword, From: cfg.App.SMTPFrom,
+	})
+	usersMod := users.New(users.Dependencies{
+		Pool: pool, Redis: rdb, AuthSecret: cfg.App.JWTSecret, EmailSender: emailSender,
+	})
 	authMod := auth.New(auth.Dependencies{
 		BotToken:    cfg.App.TelegramBotToken,
 		MaxAge:      cfg.App.AuthMaxAge,
@@ -51,6 +58,8 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 			}
 			return err
 		},
+		EmailResolver: emailResolverAdapter{users: usersMod},
+		EmailSender:   emailSender,
 	})
 	usersMod.SetAuth(authMod.Middlewares.Bearer)
 	admin := httpserver.AdminToken(cfg.App.AdminToken)
@@ -107,6 +116,19 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		Catalog: catalogMod, Social: socialMod, Feed: feedMod, Search: searchMod,
 		Notifications: notificationsMod, Gamification: gamificationMod,
 	}
+}
+
+type emailResolverAdapter struct {
+	users *users.Module
+}
+
+func (a emailResolverAdapter) ResolveLoginEmail(ctx context.Context, raw string) (string, int64, bool, error) {
+	email, telegramID, found, err := a.users.ResolveLoginEmail(ctx, raw)
+	var field userscontract.FieldError
+	if errors.As(err, &field) {
+		return "", 0, false, authcontract.ErrInvalidEmail
+	}
+	return email, telegramID, found, err
 }
 
 type reviewTypes struct {

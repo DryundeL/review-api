@@ -16,9 +16,14 @@ import (
 type Handler struct {
 	validate *application.ValidateInitDataHandler
 	login    *application.LoginService
+	email    *application.EmailLoginService
 	secret   []byte
 	maxAge   time.Duration
 	ensure   func(context.Context, contract.TelegramIdentity) error
+}
+
+func (h *Handler) SetEmailLogin(email *application.EmailLoginService) {
+	h.email = email
 }
 
 func NewHandler(validate *application.ValidateInitDataHandler, login *application.LoginService, secret []byte, maxAge time.Duration, ensure func(context.Context, contract.TelegramIdentity) error) *Handler {

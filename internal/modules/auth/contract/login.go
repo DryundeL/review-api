@@ -11,6 +11,7 @@ const (
 var (
 	ErrLoginNotFound = errors.New("login not found")
 	ErrLoginClosed   = errors.New("login closed")
+	ErrInvalidEmail  = errors.New("invalid email")
 )
 
 // Login is the browser sign-in challenge the bot shows to the user.

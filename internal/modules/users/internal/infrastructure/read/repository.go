@@ -50,6 +50,7 @@ func (r *Repository) FindCardByID(ctx context.Context, userID, viewerID uuid.UUI
 			COALESCE(u.language_code, ''),
 			u.is_premium,
 			COALESCE(u.photo_url, ''),
+			COALESCE(u.email, ''),
 			(SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.id),
 			(SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id),
 			EXISTS (
@@ -74,6 +75,7 @@ func (r *Repository) FindCardByTelegramID(ctx context.Context, telegramID int64,
 			COALESCE(u.language_code, ''),
 			u.is_premium,
 			COALESCE(u.photo_url, ''),
+			COALESCE(u.email, ''),
 			(SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.id),
 			(SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id),
 			EXISTS (
@@ -97,6 +99,7 @@ func (r *Repository) scanCard(row pgx.Row) (ports.ProfileCard, error) {
 		&card.User.LanguageCode,
 		&card.User.IsPremium,
 		&card.User.PhotoURL,
+		&card.User.Email,
 		&card.FollowersCount,
 		&card.FollowingCount,
 		&card.IsFollowing,

@@ -108,6 +108,7 @@ type ReviewWriter interface {
 }
 
 type ReviewReader interface {
+	TopByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID) ([]Review, error)
 	Get(ctx context.Context, id, viewerID uuid.UUID) (Review, error)
 	ListByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID, limit int) ([]Review, error)
 	ListByAuthor(ctx context.Context, authorID, viewerID uuid.UUID, publishedOnly bool, limit int) ([]Review, error)

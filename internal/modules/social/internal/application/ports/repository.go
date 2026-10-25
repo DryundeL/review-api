@@ -25,12 +25,16 @@ type FollowUser struct {
 }
 
 type Writer interface {
-	Create(ctx context.Context, item domain.Follow) error
+	Create(ctx context.Context, item domain.Follow) (string, error)
+	Approve(ctx context.Context, item domain.Follow) error
+	DeleteRequest(ctx context.Context, followerID, followeeID uuid.UUID) error
 	Delete(ctx context.Context, followerID, followeeID uuid.UUID) error
 }
 
 type Reader interface {
 	UserExists(ctx context.Context, userID uuid.UUID) (bool, error)
+	FollowStatus(ctx context.Context, subjectID, viewerID uuid.UUID) (string, error)
+	ListRequests(ctx context.Context, ownerID uuid.UUID, limit, offset int) ([]FollowUser, error)
 	ListFollowing(ctx context.Context, subjectID, viewerID uuid.UUID, limit, offset int) ([]FollowUser, error)
 	ListFollowers(ctx context.Context, subjectID, viewerID uuid.UUID, limit, offset int) ([]FollowUser, error)
 }

@@ -37,6 +37,7 @@ type Dependencies struct {
 type Module struct {
 	ensure         *command.EnsureUserHandler
 	profile        *query.GetProfileHandler
+	profiles       ports.ProfileReader
 	getSettings    *query.GetSettingsHandler
 	updateSettings *command.UpdateSettingsHandler
 	email          *command.EmailHandler
@@ -48,15 +49,17 @@ type Module struct {
 
 func New(deps Dependencies) *Module {
 	writeRepo := write.NewRepository(deps.Pool)
+	readRepo := read.NewRepository(deps.Pool)
 	codes := &challengeAdapter{store: authcode.New(deps.Redis, []byte(deps.AuthSecret), "users:email")}
 	return &Module{
 		ensure:         command.NewEnsureUserHandler(writeRepo, nil),
-		profile:        query.NewGetProfileHandler(read.NewRepository(deps.Pool)),
+		profile:        query.NewGetProfileHandler(readRepo),
 		getSettings:    query.NewGetSettingsHandler(writeRepo),
 		updateSettings: command.NewUpdateSettingsHandler(writeRepo),
 		email:          command.NewEmailHandler(writeRepo, codes, deps.EmailSender),
 		emailRepo:      writeRepo,
 		prefs:          writeRepo,
+		profiles:       readRepo,
 		auth:           deps.Auth,
 	}
 }
@@ -89,18 +92,18 @@ func (m *Module) UserID(ctx context.Context, telegramID int64) (uuid.UUID, error
 }
 
 func (m *Module) UserRef(ctx context.Context, userID uuid.UUID) (contract.UserRef, error) {
-	if m == nil || m.profile == nil || userID == uuid.Nil {
+	if m == nil || m.profiles == nil || userID == uuid.Nil {
 		return contract.UserRef{}, contract.ErrNotFound
 	}
-	card, err := m.profile.ByID(ctx, userID, uuid.Nil)
+	user, err := m.profiles.FindByID(ctx, userID)
 	if err != nil {
 		return contract.UserRef{}, err
 	}
 	return contract.UserRef{
-		ID:         card.User.ID,
-		TelegramID: card.User.TelegramID,
-		Username:   card.User.Username,
-		FirstName:  card.User.FirstName,
+		ID:         user.ID,
+		TelegramID: user.TelegramID,
+		Username:   user.Username,
+		FirstName:  user.FirstName,
 	}, nil
 }
 
@@ -180,4 +183,9 @@ func (a *challengeAdapter) Verify(ctx context.Context, subject, code string) (st
 
 func (a *challengeAdapter) Cancel(ctx context.Context, subject string) {
 	a.store.Cancel(ctx, subject)
+}
+
+// ProfileAccess protects profile subresources owned by other modules.
+func (m *Module) ProfileAccess() echo.MiddlewareFunc {
+	return usershttp.NewHandler(m.profile, nil, nil, m, nil).ProfileAccess
 }

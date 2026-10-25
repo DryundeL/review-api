@@ -78,7 +78,7 @@ func TestImportRequiresAdminAndRejectsBadPoster(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Count != 1 || len(body.Items) != 1 || body.Items[0].Type != "movie" || body.Items[0].OriginalTitle != "Movie" || body.Items[0].Genre != "drama" {
+	if body.Count != 1 || len(body.Items) != 1 || body.Items[0].Type != "movie" || body.Items[0].OriginalTitle != "Movie" || body.Items[0].Info.Genre != "drama" {
 		t.Fatalf("body = %+v", body)
 	}
 }
@@ -108,7 +108,7 @@ func TestImportCSV(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Count != 1 || body.Items[0].OriginalTitle != "The Matrix" || body.Items[0].Genre != "sci-fi" {
+	if body.Count != 1 || body.Items[0].OriginalTitle != "The Matrix" || body.Items[0].Info.Genre != "sci-fi" {
 		t.Fatalf("body = %+v", body)
 	}
 }
@@ -121,4 +121,51 @@ func (missingItems) Get(context.Context, uuid.UUID) (ports.MediaObject, error) {
 
 func (missingItems) Search(context.Context, string, string, int) ([]ports.MediaObject, error) {
 	return nil, nil
+}
+
+func TestImportNestedInfo(t *testing.T) {
+	for _, tc := range []struct {
+		name, contentType, body string
+		status                  int
+	}{
+		{"json", "application/json", `{"items":[{"title":"Matrix","type":"movie","info":{"genre":"sci-fi","releaseYear":1999,"releaseStatus":"completed"}}]}`, 201},
+		{"csv", "text/csv", "title,type,info\nMatrix,movie,\"{\"\"genre\"\":\"\"sci-fi\"\",\"\"releaseYear\"\":1999,\"\"releaseStatus\"\":\"\"completed\"\"}\"\n", 201},
+		{"invalid year", "application/json", `{"items":[{"title":"Matrix","type":"movie","info":{"releaseYear":1700,"releaseStatus":"completed"}}]}`, 422},
+		{"invalid status", "application/json", `{"items":[{"title":"Matrix","type":"movie","info":{"releaseStatus":"unknown"}}]}`, 422},
+		{"mixed", "application/json", `{"items":[{"title":"Matrix","type":"movie","genre":"drama","info":{"releaseStatus":"completed"}}]}`, 422},
+		{"null csv info", "text/csv", "title,type,info\nMatrix,movie,null\n", 422},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := NewHandler(command.NewImportMediaObjectsHandler(memWriter{}, memTx{}, memTypes{}, memPublisher{}), nil, nil)
+			e := echo.New()
+			e.HTTPErrorHandler = httpserver.ErrorHandler
+			e.POST("/import", h.Import)
+			req := httptest.NewRequest(http.MethodPost, "/import", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", tc.contentType)
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			if rec.Code != tc.status {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			if tc.status == 201 {
+				var body struct {
+					Items []struct {
+						Info domain.Info `json:"info"`
+					} `json:"items"`
+				}
+				if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+					t.Fatal(err)
+				}
+				if len(body.Items) != 1 || body.Items[0].Info.Genre != "sci-fi" || body.Items[0].Info.ReleaseYear == nil || *body.Items[0].Info.ReleaseYear != 1999 {
+					t.Fatalf("body=%s", rec.Body.String())
+				}
+				var raw map[string]any
+				json.Unmarshal(rec.Body.Bytes(), &raw)
+				item := raw["items"].([]any)[0].(map[string]any)
+				if _, exists := item["releaseStatus"]; exists {
+					t.Fatal("legacy field in response")
+				}
+			}
+		})
+	}
 }

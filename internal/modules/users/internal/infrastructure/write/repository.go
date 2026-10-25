@@ -147,12 +147,12 @@ func (r *Repository) GetSettings(ctx context.Context, userID uuid.UUID) (domain.
 		return domain.Settings{}, contract.ErrNotFound
 	}
 	const query = `
-		SELECT user_id, language, allow_notifications
+		SELECT user_id, language, allow_notifications, is_profile_private
 		FROM user_settings
 		WHERE user_id = $1
 	`
 	var s domain.Settings
-	err := r.queryRow(ctx, query, userID).Scan(&s.UserID, &s.Language, &s.AllowNotifications)
+	err := r.queryRow(ctx, query, userID).Scan(&s.UserID, &s.Language, &s.AllowNotifications, &s.IsProfilePrivate)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Settings{}, contract.ErrNotFound
 	}
@@ -162,20 +162,23 @@ func (r *Repository) GetSettings(ctx context.Context, userID uuid.UUID) (domain.
 	return s, nil
 }
 
-func (r *Repository) UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, allow *bool) (domain.Settings, error) {
+func (r *Repository) UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, allow *bool, private *bool) (domain.Settings, error) {
 	if r == nil || r.pool == nil || userID == uuid.Nil {
 		return domain.Settings{}, contract.ErrNotFound
 	}
 	const query = `
+		WITH target AS (SELECT id FROM users WHERE id = $1 FOR NO KEY UPDATE)
 		UPDATE user_settings
 		SET language = COALESCE($2, language),
 		    allow_notifications = COALESCE($3, allow_notifications),
+		    is_profile_private = COALESCE($4, is_profile_private),
 		    updated_at = NOW()
-		WHERE user_id = $1
-		RETURNING user_id, language, allow_notifications
+		FROM target
+		WHERE user_id = target.id
+		RETURNING user_id, language, allow_notifications, is_profile_private
 	`
 	var s domain.Settings
-	err := r.queryRow(ctx, query, userID, language, allow).Scan(&s.UserID, &s.Language, &s.AllowNotifications)
+	err := r.queryRow(ctx, query, userID, language, allow, private).Scan(&s.UserID, &s.Language, &s.AllowNotifications, &s.IsProfilePrivate)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Settings{}, contract.ErrNotFound
 	}

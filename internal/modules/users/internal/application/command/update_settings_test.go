@@ -24,13 +24,16 @@ func (f *settingsFakeRepo) GetSettings(_ context.Context, userID uuid.UUID) (dom
 	return f.stored, nil
 }
 
-func (f *settingsFakeRepo) UpdateSettings(_ context.Context, userID uuid.UUID, language *string, allow *bool) (domain.Settings, error) {
+func (f *settingsFakeRepo) UpdateSettings(_ context.Context, userID uuid.UUID, language *string, allow *bool, private *bool) (domain.Settings, error) {
 	f.stored.UserID = userID
 	if language != nil {
 		f.stored.Language = *language
 	}
 	if allow != nil {
 		f.stored.AllowNotifications = *allow
+	}
+	if private != nil {
+		f.stored.IsProfilePrivate = *private
 	}
 	return f.stored, nil
 }
@@ -59,5 +62,17 @@ func TestUpdateSettingsHandlerPatchesAllow(t *testing.T) {
 	}
 	if got.AllowNotifications || got.Language != "ru" {
 		t.Fatalf("got = %+v", got)
+	}
+}
+
+func TestUpdateSettingsPrivacy(t *testing.T) {
+	id := uuid.New()
+	repo := &settingsFakeRepo{stored: domain.Settings{UserID: id, Language: "ru", AllowNotifications: true}}
+	h := NewUpdateSettingsHandler(repo)
+	for _, private := range []bool{true, false} {
+		got, err := h.Handle(context.Background(), id, UpdateSettingsInput{IsProfilePrivate: &private})
+		if err != nil || got.IsProfilePrivate != private || got.Language != "ru" || !got.AllowNotifications {
+			t.Fatalf("settings=%+v err=%v", got, err)
+		}
 	}
 }

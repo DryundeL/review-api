@@ -27,22 +27,28 @@ const (
 var typeCode = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 var externalToken = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
+// Info contains the validated metadata stored in media_objects.info.
+type Info struct {
+	Genre         string `json:"genre,omitempty"`
+	ReleaseYear   *int   `json:"releaseYear,omitempty"`
+	ReleaseStatus string `json:"releaseStatus"`
+}
+
 // MediaObject is a catalog title that reviews point at.
 type MediaObject struct {
 	ID             uuid.UUID
 	Title          string
 	OriginalTitle  string
 	Type           string
-	Genre          string
-	ReleaseYear    *int
+	Info           Info
 	PosterURL      string
-	ReleaseStatus  string
 	ExternalSource string
 	ExternalID     string
 	CreatedBy      *uuid.UUID
 }
 
 type Draft struct {
+	Info           *Info  `json:"info"`
 	Title          string `json:"title"`
 	OriginalTitle  string `json:"originalTitle"`
 	Type           string `json:"type"`
@@ -57,6 +63,15 @@ type Draft struct {
 func MaxImportBatch() int { return maxImportBatch }
 
 func NewImported(draft Draft) (MediaObject, error) {
+	if draft.Info != nil {
+		if draft.Genre != "" || draft.ReleaseYear != nil || draft.ReleaseStatus != "" {
+			return MediaObject{}, contract.FieldError{Field: "info"}
+		}
+		draft.Genre = draft.Info.Genre
+		draft.ReleaseYear = draft.Info.ReleaseYear
+		draft.ReleaseStatus = draft.Info.ReleaseStatus
+	}
+
 	title, err := parseTitle(draft.Title)
 	if err != nil {
 		return MediaObject{}, err
@@ -97,10 +112,8 @@ func NewImported(draft Draft) (MediaObject, error) {
 		Title:          title,
 		OriginalTitle:  original,
 		Type:           typ,
-		Genre:          genre,
-		ReleaseYear:    year,
+		Info:           Info{Genre: genre, ReleaseYear: year, ReleaseStatus: draft.ReleaseStatus},
 		PosterURL:      poster,
-		ReleaseStatus:  draft.ReleaseStatus,
 		ExternalSource: source,
 		ExternalID:     id,
 	}, nil

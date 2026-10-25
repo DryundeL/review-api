@@ -25,7 +25,7 @@ func (h *UpdatePrefsHandler) Handle(ctx context.Context, userID uuid.UUID, items
 	if len(items) == 0 {
 		return nil, contract.FieldError{Field: "items"}
 	}
-	var like, follow *bool
+	var like, follow, followRequest *bool
 	seen := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		if item.Name == "" {
@@ -41,6 +41,8 @@ func (h *UpdatePrefsHandler) Handle(ctx context.Context, userID uuid.UUID, items
 			like = &enabled
 		case "follow":
 			follow = &enabled
+		case "follow_request":
+			followRequest = &enabled
 		default:
 			return nil, contract.FieldError{Field: "name"}
 		}
@@ -48,7 +50,7 @@ func (h *UpdatePrefsHandler) Handle(ctx context.Context, userID uuid.UUID, items
 	if err := h.repo.EnsureDefaults(ctx, userID); err != nil {
 		return nil, fmt.Errorf("update prefs: %w", err)
 	}
-	if err := h.repo.Patch(ctx, userID, like, follow); err != nil {
+	if err := h.repo.Patch(ctx, userID, like, follow, followRequest); err != nil {
 		return nil, fmt.Errorf("update prefs: %w", err)
 	}
 	return h.repo.List(ctx, userID)

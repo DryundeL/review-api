@@ -54,3 +54,14 @@ func (h *ListReviewsHandler) ByAuthor(ctx context.Context, authorID, viewerID uu
 	}
 	return h.repo.ListByAuthor(ctx, authorID, viewerID, publishedOnly, limit)
 }
+
+// TopByMedia returns at most five published reviews, ranked by likes.
+func (h *ListReviewsHandler) TopByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID) ([]ports.Review, error) {
+	if h == nil || h.repo == nil {
+		return nil, contract.ErrInvalid
+	}
+	if mediaObjectID == uuid.Nil {
+		return nil, contract.ErrNotFound
+	}
+	return h.repo.TopByMedia(ctx, mediaObjectID, viewerID)
+}

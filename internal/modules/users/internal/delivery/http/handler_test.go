@@ -19,6 +19,7 @@ import (
 )
 
 type stubProfiles struct {
+	private     bool
 	user        domain.User
 	followers   int64
 	following   int64
@@ -42,7 +43,7 @@ func (s stubProfiles) FindCardByID(_ context.Context, userID, viewerID uuid.UUID
 	}
 	following := s.isFollowing && viewerID != uuid.Nil && viewerID != s.user.ID
 	return ports.ProfileCard{
-		User: s.user, FollowersCount: s.followers, FollowingCount: s.following, IsFollowing: following,
+		IsProfilePrivate: s.private, User: s.user, FollowersCount: s.followers, FollowingCount: s.following, IsFollowing: following,
 	}, nil
 }
 
@@ -50,7 +51,7 @@ func (s stubProfiles) FindCardByTelegramID(_ context.Context, telegramID int64, 
 	if telegramID != s.user.TelegramID {
 		return ports.ProfileCard{}, contract.ErrNotFound
 	}
-	return ports.ProfileCard{User: s.user, FollowersCount: s.followers, FollowingCount: s.following}, nil
+	return ports.ProfileCard{IsProfilePrivate: s.private, User: s.user, FollowersCount: s.followers, FollowingCount: s.following}, nil
 }
 
 type stubUsers struct {
@@ -156,5 +157,69 @@ func TestPublicProfile_isMeAndIsFollowing(t *testing.T) {
 	}
 	if !body.IsMe || body.IsFollowing || body.TelegramID == nil {
 		t.Fatalf("self via id body = %+v", body)
+	}
+}
+
+func TestPrivacySettingsJSON(t *testing.T) {
+	for _, private := range []bool{true, false} {
+		raw, err := json.Marshal(settingsJSON(domain.Settings{Language: "ru", AllowNotifications: true, IsProfilePrivate: private}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got map[string]any
+		if err := json.Unmarshal(raw, &got); err != nil {
+			t.Fatal(err)
+		}
+		if value, ok := got["isProfilePrivate"]; !ok || value != private {
+			t.Fatalf("settings=%s", raw)
+		}
+	}
+}
+
+func TestPrivateProfileAccess(t *testing.T) {
+	owner := uuid.New()
+	for _, tc := range []struct {
+		name                        string
+		private, own, authenticated bool
+		status                      int
+	}{
+		{"public anonymous", false, false, false, 200}, {"private anonymous", true, false, false, 404},
+		{"private other", true, false, true, 404}, {"private owner", true, true, true, 200},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			viewer := uuid.New()
+			if tc.own {
+				viewer = owner
+			}
+			h := NewHandler(query.NewGetProfileHandler(stubProfiles{user: domain.User{ID: owner, TelegramID: 42, FirstName: "Owner"}, private: tc.private}), nil, nil, stubUsers{id: viewer}, nil)
+			auth := func(next echo.HandlerFunc) echo.HandlerFunc {
+				return func(c echo.Context) error {
+					ctx := authcontract.WithIdentity(c.Request().Context(), authcontract.TelegramIdentity{TelegramID: 42})
+					c.SetRequest(c.Request().WithContext(ctx))
+					return next(c)
+				}
+			}
+			for _, suffix := range []string{"", "/reviews", "/following", "/followers", "/achievements"} {
+				e := echo.New()
+				e.HTTPErrorHandler = httpserver.ErrorHandler
+				if suffix == "" {
+					e.GET("/profiles/:id", h.PublicProfile, optionalAuth(auth))
+				} else {
+					e.GET("/profiles/:id"+suffix, func(c echo.Context) error { return c.NoContent(200) }, optionalAuth(auth), h.ProfileAccess)
+				}
+				req := httptest.NewRequest(http.MethodGet, "/profiles/"+owner.String()+suffix, nil)
+				if tc.authenticated {
+					req.Header.Set("Authorization", "Bearer test")
+				}
+				rec := httptest.NewRecorder()
+				e.ServeHTTP(rec, req)
+				if rec.Code != tc.status {
+					t.Fatalf("suffix=%s status=%d body=%s", suffix, rec.Code, rec.Body.String())
+				}
+				if rec.Header().Get("Cache-Control") != "no-store" {
+					t.Fatalf("cacheable private resource %s", suffix)
+				}
+			}
+		})
 	}
 }

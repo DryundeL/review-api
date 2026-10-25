@@ -33,6 +33,7 @@ type Module struct {
 	listFollowing *query.ListFollowingHandler
 	listFollowers *query.ListFollowersHandler
 	users         UserResolver
+	requests      *query.FollowRequestsHandler
 	auth          echo.MiddlewareFunc
 }
 
@@ -43,18 +44,21 @@ func New(deps Dependencies) *Module {
 	pub := outboxpub.New(outbox.NewStore(deps.Pool))
 	return &Module{
 		follow:        command.NewFollowHandler(writer, tx, pub),
-		unfollow:      command.NewUnfollowHandler(writer),
+		unfollow:      command.NewUnfollowHandler(writer, tx),
 		listFollowing: query.NewListFollowingHandler(reader),
 		listFollowers: query.NewListFollowersHandler(reader),
 		users:         deps.Users,
+		requests:      query.NewFollowRequestsHandler(reader),
 		auth:          deps.Auth,
 	}
 }
 
 func (m *Module) Name() string { return "social" }
 
-func (m *Module) RegisterHTTP(g *echo.Group) {
-	socialhttp.Register(g, socialhttp.NewHandler(
+func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) {
+	h := socialhttp.NewHandler(
 		m.follow, m.unfollow, m.listFollowing, m.listFollowers, m.users,
-	), m.auth)
+	)
+	h.SetRequests(m.requests)
+	socialhttp.Register(g, h, m.auth, profileAccess)
 }

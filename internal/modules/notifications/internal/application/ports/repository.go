@@ -22,7 +22,7 @@ type PrefPatch struct {
 type PrefRepository interface {
 	EnsureDefaults(ctx context.Context, userID uuid.UUID) error
 	List(ctx context.Context, userID uuid.UUID) ([]PrefItem, error)
-	Patch(ctx context.Context, userID uuid.UUID, like, follow *bool) error
+	Patch(ctx context.Context, userID uuid.UUID, like, follow, followRequest *bool) error
 	TypeEnabled(ctx context.Context, userID uuid.UUID, name string) (bool, error)
 	TypeMeta(ctx context.Context, name string) (TypeMeta, error)
 }
@@ -46,7 +46,8 @@ type Notification struct {
 }
 
 type InboxRepository interface {
-	Insert(ctx context.Context, item Notification) error
+	// Insert returns false when the notification ID already exists.
+	Insert(ctx context.Context, item Notification) (bool, error)
 	ListInbox(ctx context.Context, userID uuid.UUID, limit, offset int) ([]Notification, error)
 	UnreadCount(ctx context.Context, userID uuid.UUID) (int64, error)
 	MarkRead(ctx context.Context, userID, id uuid.UUID) error

@@ -22,7 +22,7 @@ func (f *createFake) EnsureDefaults(context.Context, uuid.UUID) error { return n
 func (f *createFake) List(context.Context, uuid.UUID) ([]ports.PrefItem, error) {
 	return nil, nil
 }
-func (f *createFake) Patch(context.Context, uuid.UUID, *bool, *bool) error { return nil }
+func (f *createFake) Patch(context.Context, uuid.UUID, *bool, *bool, *bool) error { return nil }
 func (f *createFake) TypeEnabled(_ context.Context, _ uuid.UUID, name string) (bool, error) {
 	if name == "like" {
 		return f.likeEnabled, nil
@@ -32,9 +32,9 @@ func (f *createFake) TypeEnabled(_ context.Context, _ uuid.UUID, name string) (b
 func (f *createFake) TypeMeta(_ context.Context, name string) (ports.TypeMeta, error) {
 	return ports.TypeMeta{Name: name, Title: "T", Text: "base"}, nil
 }
-func (f *createFake) Insert(context.Context, ports.Notification) error {
+func (f *createFake) Insert(context.Context, ports.Notification) (bool, error) {
 	f.inserted = true
-	return nil
+	return true, nil
 }
 func (f *createFake) ListInbox(_ context.Context, _ uuid.UUID, _, _ int) ([]ports.Notification, error) {
 	return nil, nil

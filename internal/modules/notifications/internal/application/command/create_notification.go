@@ -52,11 +52,13 @@ func NewCreateNotificationHandler(
 }
 
 type CreateInput struct {
-	RecipientID uuid.UUID
-	ActorID     uuid.UUID
-	TypeName    string
-	ReviewID    *uuid.UUID
-	ReviewTitle string
+	// NotificationID is stable across event retries; zero generates a new ID.
+	NotificationID uuid.UUID
+	RecipientID    uuid.UUID
+	ActorID        uuid.UUID
+	TypeName       string
+	ReviewID       *uuid.UUID
+	ReviewTitle    string
 }
 
 // Handle creates an inbox row when the type is enabled; optionally mirrors to Telegram.
@@ -84,8 +86,12 @@ func (h *CreateNotificationHandler) Handle(ctx context.Context, in CreateInput) 
 		return fmt.Errorf("create notification: actor: %w", err)
 	}
 	body := domain.RenderBody(meta.Text, actor.DisplayName(), in.ReviewTitle)
+	id := in.NotificationID
+	if id == uuid.Nil {
+		id = uuid.New()
+	}
 	item := ports.Notification{
-		ID:        uuid.New(),
+		ID:        id,
 		UserID:    in.RecipientID,
 		TypeName:  meta.Name,
 		Title:     meta.Title,
@@ -94,10 +100,14 @@ func (h *CreateNotificationHandler) Handle(ctx context.Context, in CreateInput) 
 		ReviewID:  in.ReviewID,
 		CreatedAt: h.now().UTC(),
 	}
-	if err := h.inbox.Insert(ctx, item); err != nil {
+	inserted, err := h.inbox.Insert(ctx, item)
+	if err != nil {
 		return fmt.Errorf("create notification: %w", err)
 	}
 
+	if !inserted {
+		return nil
+	}
 	allowed, err := h.allow.AllowNotificationsByUserID(ctx, in.RecipientID)
 	if err != nil {
 		h.log.WarnContext(ctx, "notification allow check failed", "error", err, "user_id", in.RecipientID)

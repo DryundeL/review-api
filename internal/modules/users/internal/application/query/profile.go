@@ -12,11 +12,13 @@ import (
 
 // Card is the profile payload for HTTP (own or public).
 type Card struct {
-	User           domain.User
-	FollowersCount int64
-	FollowingCount int64
-	IsFollowing    bool
-	IsMe           bool
+	FollowStatus     string
+	IsProfilePrivate bool
+	User             domain.User
+	FollowersCount   int64
+	FollowingCount   int64
+	IsFollowing      bool
+	IsMe             bool
 }
 
 type GetProfileHandler struct {
@@ -43,11 +45,13 @@ func (h *GetProfileHandler) Own(ctx context.Context, telegramID int64) (Card, er
 		return Card{}, err
 	}
 	return Card{
-		User:           card.User,
-		FollowersCount: card.FollowersCount,
-		FollowingCount: card.FollowingCount,
-		IsFollowing:    false,
-		IsMe:           true,
+		User:             card.User,
+		IsProfilePrivate: card.IsProfilePrivate,
+		FollowStatus:     card.FollowStatus,
+		FollowersCount:   card.FollowersCount,
+		FollowingCount:   card.FollowingCount,
+		IsFollowing:      false,
+		IsMe:             true,
 	}, nil
 }
 
@@ -60,12 +64,17 @@ func (h *GetProfileHandler) ByID(ctx context.Context, userID, viewerID uuid.UUID
 		return Card{}, err
 	}
 	isMe := viewerID != uuid.Nil && viewerID == card.User.ID
+	if card.IsProfilePrivate && !isMe && !card.IsFollowing {
+		return Card{}, contract.ErrNotFound
+	}
 	isFollowing := card.IsFollowing && !isMe
 	return Card{
-		User:           card.User,
-		FollowersCount: card.FollowersCount,
-		FollowingCount: card.FollowingCount,
-		IsFollowing:    isFollowing,
-		IsMe:           isMe,
+		User:             card.User,
+		IsProfilePrivate: card.IsProfilePrivate,
+		FollowStatus:     card.FollowStatus,
+		FollowersCount:   card.FollowersCount,
+		FollowingCount:   card.FollowingCount,
+		IsFollowing:      isFollowing,
+		IsMe:             isMe,
 	}, nil
 }

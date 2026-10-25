@@ -123,7 +123,7 @@ func statusItems(items []Status) []reviewshttp.StatusItem {
 
 func (m *Module) Name() string { return "reviews" }
 
-func (m *Module) RegisterHTTP(g *echo.Group) {
+func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) {
 	reviewshttp.Register(g, reviewshttp.NewHandler(reviewshttp.HandlerDeps{
 		ListTypes:    m.list,
 		CreateType:   m.create,
@@ -139,5 +139,5 @@ func (m *Module) RegisterHTTP(g *echo.Group) {
 		ListReasons:  m.listReasons,
 		CreateReport: m.createReport,
 		Users:        m.users,
-	}), m.admin, m.auth)
+	}), m.admin, m.auth, profileAccess)
 }

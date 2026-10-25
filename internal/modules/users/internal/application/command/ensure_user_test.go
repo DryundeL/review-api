@@ -52,7 +52,7 @@ func (f *fakeRepo) GetSettings(_ context.Context, _ uuid.UUID) (domain.Settings,
 	return domain.Settings{}, nil
 }
 
-func (f *fakeRepo) UpdateSettings(_ context.Context, _ uuid.UUID, _ *string, _ *bool) (domain.Settings, error) {
+func (f *fakeRepo) UpdateSettings(_ context.Context, _ uuid.UUID, _ *string, _ *bool, _ *bool) (domain.Settings, error) {
 	return domain.Settings{}, nil
 }
 

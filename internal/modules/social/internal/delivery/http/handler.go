@@ -28,6 +28,7 @@ type Handler struct {
 	listFollowing *query.ListFollowingHandler
 	listFollowers *query.ListFollowersHandler
 	users         UserResolver
+	requests      *query.FollowRequestsHandler
 }
 
 func NewHandler(
@@ -45,19 +46,28 @@ func NewHandler(
 }
 
 func (h *Handler) Follow(c echo.Context) error {
+	return h.followUser(c, c.Param("userId"))
+}
+
+func (h *Handler) followUser(c echo.Context, rawID string) error {
 	followerID, err := h.requireUser(c)
 	if err != nil {
 		return err
 	}
-	followeeID, err := uuid.Parse(c.Param("userId"))
+	followeeID, err := uuid.Parse(rawID)
 	if err != nil {
 		return mapError(contract.FieldError{Field: "followeeId"})
 	}
-	if err := h.follow.Handle(c.Request().Context(), followerID, followeeID); err != nil {
+	status, err := h.follow.Handle(c.Request().Context(), followerID, followeeID)
+	if err != nil {
 		return mapError(err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
-	return c.NoContent(http.StatusNoContent)
+	code := http.StatusOK
+	if status == "pending" {
+		code = http.StatusAccepted
+	}
+	return c.JSON(code, followStateJSON{FollowStatus: status, IsFollowing: status == "following"})
 }
 
 func (h *Handler) Unfollow(c echo.Context) error {

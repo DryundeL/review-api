@@ -44,6 +44,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID) ([]ports.PrefIt
 			CASE t.name
 				WHEN 'like' THEN COALESCE(s.like_enabled, TRUE)
 				WHEN 'follow' THEN COALESCE(s.follow_enabled, TRUE)
+				WHEN 'follow_request' THEN COALESCE(s.follow_request_enabled, TRUE)
 				ELSE TRUE
 			END
 		FROM notification_types t
@@ -56,7 +57,7 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID) ([]ports.PrefIt
 	}
 	defer rows.Close()
 
-	out := make([]ports.PrefItem, 0, 2)
+	out := make([]ports.PrefItem, 0, 3)
 	for rows.Next() {
 		var item ports.PrefItem
 		if err := rows.Scan(&item.Name, &item.Title, &item.Text, &item.Enabled); err != nil {
@@ -70,14 +71,15 @@ func (r *Repository) List(ctx context.Context, userID uuid.UUID) ([]ports.PrefIt
 	return out, nil
 }
 
-func (r *Repository) Patch(ctx context.Context, userID uuid.UUID, like, follow *bool) error {
+func (r *Repository) Patch(ctx context.Context, userID uuid.UUID, like, follow, followRequest *bool) error {
 	const query = `
 		UPDATE user_notification_settings
 		SET like_enabled = COALESCE($2, like_enabled),
-		    follow_enabled = COALESCE($3, follow_enabled)
+		    follow_enabled = COALESCE($3, follow_enabled),
+		    follow_request_enabled = COALESCE($4, follow_request_enabled)
 		WHERE user_id = $1
 	`
-	if err := r.exec(ctx, query, userID, like, follow); err != nil {
+	if err := r.exec(ctx, query, userID, like, follow, followRequest); err != nil {
 		return fmt.Errorf("patch notification settings: %w", err)
 	}
 	return nil
@@ -88,6 +90,7 @@ func (r *Repository) TypeEnabled(ctx context.Context, userID uuid.UUID, name str
 		SELECT CASE $2
 			WHEN 'like' THEN COALESCE(s.like_enabled, TRUE)
 			WHEN 'follow' THEN COALESCE(s.follow_enabled, TRUE)
+				WHEN 'follow_request' THEN COALESCE(s.follow_request_enabled, TRUE)
 			ELSE FALSE
 		END
 		FROM (SELECT 1) AS _
@@ -113,19 +116,21 @@ func (r *Repository) TypeMeta(ctx context.Context, name string) (ports.TypeMeta,
 	return meta, nil
 }
 
-func (r *Repository) Insert(ctx context.Context, item ports.Notification) error {
+func (r *Repository) Insert(ctx context.Context, item ports.Notification) (bool, error) {
 	const query = `
 		INSERT INTO notifications (
 			id, user_id, type_name, title, body, actor_id, review_id, created_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (id) DO NOTHING
 	`
-	if err := r.exec(ctx, query,
+	tag, err := r.execTag(ctx, query,
 		item.ID, item.UserID, item.TypeName, item.Title, item.Body,
 		item.ActorID, item.ReviewID, item.CreatedAt.UTC(),
-	); err != nil {
-		return fmt.Errorf("insert notification: %w", err)
+	)
+	if err != nil {
+		return false, fmt.Errorf("insert notification: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *Repository) ListInbox(ctx context.Context, userID uuid.UUID, limit, offset int) ([]ports.Notification, error) {

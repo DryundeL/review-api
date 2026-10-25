@@ -51,6 +51,12 @@ func (r *Repository) FindCardByID(ctx context.Context, userID, viewerID uuid.UUI
 			u.is_premium,
 			COALESCE(u.photo_url, ''),
 			COALESCE(u.email, ''),
+			CASE
+				WHEN EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = u.id) THEN 'following'
+				WHEN EXISTS (SELECT 1 FROM follow_requests WHERE follower_id = $2 AND followee_id = u.id) THEN 'pending'
+				ELSE 'none'
+			END,
+			COALESCE((SELECT s.is_profile_private FROM user_settings s WHERE s.user_id = u.id), FALSE),
 			(SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.id),
 			(SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id),
 			EXISTS (
@@ -76,6 +82,12 @@ func (r *Repository) FindCardByTelegramID(ctx context.Context, telegramID int64,
 			u.is_premium,
 			COALESCE(u.photo_url, ''),
 			COALESCE(u.email, ''),
+			CASE
+				WHEN EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = u.id) THEN 'following'
+				WHEN EXISTS (SELECT 1 FROM follow_requests WHERE follower_id = $2 AND followee_id = u.id) THEN 'pending'
+				ELSE 'none'
+			END,
+			COALESCE((SELECT s.is_profile_private FROM user_settings s WHERE s.user_id = u.id), FALSE),
 			(SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.id),
 			(SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id),
 			EXISTS (
@@ -100,6 +112,8 @@ func (r *Repository) scanCard(row pgx.Row) (ports.ProfileCard, error) {
 		&card.User.IsPremium,
 		&card.User.PhotoURL,
 		&card.User.Email,
+		&card.FollowStatus,
+		&card.IsProfilePrivate,
 		&card.FollowersCount,
 		&card.FollowingCount,
 		&card.IsFollowing,

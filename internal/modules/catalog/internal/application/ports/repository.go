@@ -13,10 +13,8 @@ type MediaObject struct {
 	Title          string
 	OriginalTitle  string
 	Type           string
-	Genre          string
-	ReleaseYear    *int
+	Info           domain.Info
 	PosterURL      string
-	ReleaseStatus  string
 	ExternalSource string
 	ExternalID     string
 	CreatedBy      *uuid.UUID

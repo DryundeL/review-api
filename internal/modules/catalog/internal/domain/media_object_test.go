@@ -23,7 +23,7 @@ func TestNewImported(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item.Title != "Матрица" || item.OriginalTitle != "The Matrix" || item.Genre != "sci-fi" || item.Type != "movie" || item.PosterURL == "" || item.CreatedBy != nil {
+	if item.Title != "Матрица" || item.OriginalTitle != "The Matrix" || item.Info.Genre != "sci-fi" || item.Type != "movie" || item.PosterURL == "" || item.CreatedBy != nil {
 		t.Fatalf("item = %+v", item)
 	}
 }
@@ -55,3 +55,26 @@ func TestNewImportedRejectsPosterAndStatus(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
+
+func TestNewImportedInfo(t *testing.T) {
+	year := 1999
+	item, err := NewImported(Draft{Title: "Matrix", Type: "movie", Info: &Info{Genre: " sci-fi ", ReleaseYear: &year, ReleaseStatus: "completed"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Info.Genre != "sci-fi" || *item.Info.ReleaseYear != year || item.Info.ReleaseStatus != "completed" {
+		t.Fatalf("info = %+v", item.Info)
+	}
+	year = 2000
+	if *item.Info.ReleaseYear != 1999 {
+		t.Fatal("year aliases input")
+	}
+}
+
+func TestNewImportedRejectsMixedInfo(t *testing.T) {
+	_, err := NewImported(Draft{Title: "Matrix", Type: "movie", Genre: "drama", Info: &Info{ReleaseStatus: "completed"}})
+	var field contract.FieldError
+	if !errors.As(err, &field) || field.Field != "info" {
+		t.Fatalf("err = %v", err)
+	}
+}

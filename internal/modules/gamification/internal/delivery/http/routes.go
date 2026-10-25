@@ -6,7 +6,7 @@ import (
 	"review-api/internal/http/httperr"
 )
 
-func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
+func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc, profileAccess ...echo.MiddlewareFunc) {
 	if auth == nil {
 		auth = denyUnauthorized
 	}
@@ -14,13 +14,14 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
 		admin = denyUnauthorized
 	}
 	opt := optionalAuth(auth)
+	profileMiddleware := append([]echo.MiddlewareFunc{opt}, profileAccess...)
 
 	g.GET("/shop/items", h.ListShop)
 	g.GET("/gamification/me", h.Me, auth)
 	g.POST("/shop/purchases", h.Purchase, auth)
 	g.PUT("/gamification/equipped", h.Equip, auth)
 
-	g.GET("/profiles/:id/achievements", h.ListProfileAchievements, opt)
+	g.GET("/profiles/:id/achievements", h.ListProfileAchievements, profileMiddleware...)
 
 	adminShop := g.Group("/admin/shop-items", admin)
 	adminShop.GET("", h.AdminList)

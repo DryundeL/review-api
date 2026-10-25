@@ -66,6 +66,7 @@ func (h *Handler) Profile(c echo.Context) error {
 }
 
 func (h *Handler) PublicProfile(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
 	userID, err := uuid.Parse(c.Param("id"))
 	if err != nil || userID == uuid.Nil {
 		return httperr.New(http.StatusNotFound, "NOT_FOUND", "user not found")
@@ -112,6 +113,7 @@ func (h *Handler) PatchSettings(c echo.Context) error {
 	s, err := h.update.Handle(c.Request().Context(), userID, command.UpdateSettingsInput{
 		Language:           body.Language,
 		AllowNotifications: body.AllowNotifications,
+		IsProfilePrivate:   body.IsProfilePrivate,
 	})
 	if err != nil {
 		return mapSettingsError(err)
@@ -206,45 +208,57 @@ func (h *Handler) optionalViewer(c echo.Context) (uuid.UUID, error) {
 }
 
 type profileResponse struct {
-	ID             string `json:"id"`
-	Username       string `json:"username"`
-	FirstName      string `json:"firstName"`
-	LastName       string `json:"lastName"`
-	PhotoURL       string `json:"photoUrl,omitempty"`
-	FollowersCount int64  `json:"followersCount"`
-	FollowingCount int64  `json:"followingCount"`
-	IsFollowing    bool   `json:"isFollowing"`
-	IsMe           bool   `json:"isMe"`
-	TelegramID     *int64 `json:"telegramId,omitempty"`
-	LanguageCode   string `json:"languageCode,omitempty"`
-	IsPremium      *bool  `json:"isPremium,omitempty"`
-	Email          string `json:"email,omitempty"`
-	Background     string `json:"background,omitempty"`
-	AvatarFrame    string `json:"avatarFrame,omitempty"`
-	Backdrop       string `json:"backdrop,omitempty"`
+	FollowStatus     string `json:"followStatus"`
+	IsProfilePrivate bool   `json:"isProfilePrivate"`
+	ID               string `json:"id"`
+	Username         string `json:"username"`
+	FirstName        string `json:"firstName"`
+	LastName         string `json:"lastName"`
+	PhotoURL         string `json:"photoUrl,omitempty"`
+	FollowersCount   int64  `json:"followersCount"`
+	FollowingCount   int64  `json:"followingCount"`
+	IsFollowing      bool   `json:"isFollowing"`
+	IsMe             bool   `json:"isMe"`
+	TelegramID       *int64 `json:"telegramId,omitempty"`
+	LanguageCode     string `json:"languageCode,omitempty"`
+	IsPremium        *bool  `json:"isPremium,omitempty"`
+	Email            string `json:"email,omitempty"`
+	Background       string `json:"background,omitempty"`
+	AvatarFrame      string `json:"avatarFrame,omitempty"`
+	Backdrop         string `json:"backdrop,omitempty"`
 }
 
 type settingsResponse struct {
+	IsProfilePrivate   bool   `json:"isProfilePrivate"`
 	Language           string `json:"language"`
 	AllowNotifications bool   `json:"allowNotifications"`
 }
 
 type settingsPatchBody struct {
+	IsProfilePrivate   *bool   `json:"isProfilePrivate"`
 	Language           *string `json:"language"`
 	AllowNotifications *bool   `json:"allowNotifications"`
 }
 
 func (h *Handler) profileJSON(ctx context.Context, card query.Card, includePrivate bool) profileResponse {
 	out := profileResponse{
-		ID:             card.User.ID.String(),
-		Username:       card.User.Username,
-		FirstName:      card.User.FirstName,
-		LastName:       card.User.LastName,
-		PhotoURL:       card.User.PhotoURL,
-		FollowersCount: card.FollowersCount,
-		FollowingCount: card.FollowingCount,
-		IsFollowing:    card.IsFollowing,
-		IsMe:           card.IsMe,
+		ID:               card.User.ID.String(),
+		IsProfilePrivate: card.IsProfilePrivate,
+		FollowStatus:     card.FollowStatus,
+		Username:         card.User.Username,
+		FirstName:        card.User.FirstName,
+		LastName:         card.User.LastName,
+		PhotoURL:         card.User.PhotoURL,
+		FollowersCount:   card.FollowersCount,
+		FollowingCount:   card.FollowingCount,
+		IsFollowing:      card.IsFollowing,
+		IsMe:             card.IsMe,
+	}
+	if out.FollowStatus == "" {
+		out.FollowStatus = "none"
+		if card.IsFollowing {
+			out.FollowStatus = "following"
+		}
 	}
 	if includePrivate {
 		tid := card.User.TelegramID
@@ -268,6 +282,7 @@ func settingsJSON(s domain.Settings) settingsResponse {
 	return settingsResponse{
 		Language:           s.Language,
 		AllowNotifications: s.AllowNotifications,
+		IsProfilePrivate:   s.IsProfilePrivate,
 	}
 }
 

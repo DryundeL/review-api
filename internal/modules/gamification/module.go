@@ -118,13 +118,13 @@ func (m *Module) Cosmetics(ctx context.Context, userID uuid.UUID) (contract.Cosm
 	return m.cosmetics.Handle(ctx, userID)
 }
 
-func (m *Module) RegisterHTTP(g *echo.Group) {
+func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) {
 	gamificationhttp.Register(g, gamificationhttp.NewHandler(gamificationhttp.HandlerDeps{
 		List: m.list, Create: m.create, Update: m.update,
 		Me: m.me, Purchase: m.purchase, Equip: m.equip, Users: m.users,
 		ListAchievements: m.listAchievements, ListProgress: m.listProgress,
 		CreateAchievement: m.createAchievement, UpdateAchievement: m.updateAchievement,
-	}), m.admin, m.auth)
+	}), m.admin, m.auth, profileAccess)
 }
 
 func (m *Module) RegisterConsumers(d *eventbus.Dispatcher) {

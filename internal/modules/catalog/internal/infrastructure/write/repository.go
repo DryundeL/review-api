@@ -24,18 +24,15 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 func (r *Repository) Save(ctx context.Context, item domain.MediaObject) error {
 	const insert = `
 		INSERT INTO media_objects (
-			id, title, original_title, type, genre, release_year, poster_url, release_status,
+			id, title, original_title, type, info, poster_url,
 			external_source, external_id, created_by
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
 	`
-	var original, genre, poster any
+	var original, poster any
 	if item.OriginalTitle != "" {
 		original = item.OriginalTitle
-	}
-	if item.Genre != "" {
-		genre = item.Genre
 	}
 	if item.PosterURL != "" {
 		poster = item.PosterURL
@@ -50,7 +47,7 @@ func (r *Repository) Save(ctx context.Context, item domain.MediaObject) error {
 		createdBy = *item.CreatedBy
 	}
 	if err := r.exec(ctx, insert,
-		item.ID, item.Title, original, item.Type, genre, item.ReleaseYear, poster, item.ReleaseStatus,
+		item.ID, item.Title, original, item.Type, item.Info, poster,
 		source, externalID, createdBy,
 	); err != nil {
 		return mapWriteError(err)

@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
 
+	"review-api/internal/http/httperr"
 	authmodule "review-api/internal/modules/auth"
 	catalogmodule "review-api/internal/modules/catalog"
 	feedmodule "review-api/internal/modules/feed"
@@ -38,6 +39,12 @@ type APIOptions struct {
 func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 	v1 := e.Group("/v1")
 	v1.Use(ratelimit.Middleware(opts.Redis, opts.RateLimitPerMin, time.Minute))
+	profileAccess := echo.MiddlewareFunc(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(echo.Context) error { return httperr.New(404, "NOT_FOUND", "user not found") }
+	})
+	if modules.Users != nil {
+		profileAccess = modules.Users.ProfileAccess()
+	}
 	if modules.Auth != nil {
 		modules.Auth.RegisterHTTP(v1)
 	}
@@ -45,13 +52,13 @@ func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 		modules.Users.RegisterHTTP(v1)
 	}
 	if modules.Reviews != nil {
-		modules.Reviews.RegisterHTTP(v1)
+		modules.Reviews.RegisterHTTP(v1, profileAccess)
 	}
 	if modules.Catalog != nil {
 		modules.Catalog.RegisterHTTP(v1)
 	}
 	if modules.Social != nil {
-		modules.Social.RegisterHTTP(v1)
+		modules.Social.RegisterHTTP(v1, profileAccess)
 	}
 	if modules.Feed != nil {
 		modules.Feed.RegisterHTTP(v1)
@@ -63,6 +70,6 @@ func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 		modules.Notifications.RegisterHTTP(v1)
 	}
 	if modules.Gamification != nil {
-		modules.Gamification.RegisterHTTP(v1)
+		modules.Gamification.RegisterHTTP(v1, profileAccess)
 	}
 }

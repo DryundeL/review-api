@@ -15,7 +15,7 @@ type UserRepository interface {
 	AllowNotificationsByUserID(ctx context.Context, userID uuid.UUID) (bool, error)
 	SetAllowNotifications(ctx context.Context, telegramID int64, allow bool) error
 	GetSettings(ctx context.Context, userID uuid.UUID) (domain.Settings, error)
-	UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, allow *bool) (domain.Settings, error)
+	UpdateSettings(ctx context.Context, userID uuid.UUID, language *string, allow *bool, private *bool) (domain.Settings, error)
 }
 
 type EmailRepository interface {
@@ -25,10 +25,12 @@ type EmailRepository interface {
 
 // ProfileCard is a user row plus follow stats for profile screens.
 type ProfileCard struct {
-	User           domain.User
-	FollowersCount int64
-	FollowingCount int64
-	IsFollowing    bool
+	FollowStatus     string
+	IsProfilePrivate bool
+	User             domain.User
+	FollowersCount   int64
+	FollowingCount   int64
+	IsFollowing      bool
 }
 
 type ProfileReader interface {

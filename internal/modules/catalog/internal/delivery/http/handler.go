@@ -2,6 +2,7 @@ package cataloghttp
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -116,7 +117,7 @@ func parseCSV(r io.Reader) ([]domain.Draft, error) {
 }
 
 type csvCol struct {
-	title, original, typ, genre, year, poster, status, source, externalID int
+	title, original, typ, genre, year, poster, status, source, externalID, info int
 }
 
 func csvColumns(header []string) (csvCol, error) {
@@ -124,15 +125,24 @@ func csvColumns(header []string) (csvCol, error) {
 	for i, name := range header {
 		idx[strings.TrimSpace(strings.ToLower(name))] = i
 	}
-	required := []string{"title", "type", "release_status"}
+	required := []string{"title", "type"}
+	if _, ok := idx["info"]; !ok {
+		required = append(required, "release_status")
+	}
 	for _, name := range required {
 		if _, ok := idx[name]; !ok {
 			return csvCol{}, invalid("items", -1)
 		}
 	}
 	col := csvCol{
-		title: idx["title"], typ: idx["type"], status: idx["release_status"],
+		title: idx["title"], typ: idx["type"], status: -1, info: -1,
 		original: -1, genre: -1, year: -1, poster: -1, source: -1, externalID: -1,
+	}
+	if i, ok := idx["release_status"]; ok {
+		col.status = i
+	}
+	if i, ok := idx["info"]; ok {
+		col.info = i
 	}
 	if i, ok := idx["original_title"]; ok {
 		col.original = i
@@ -172,6 +182,11 @@ func draftFromCSV(rec []string, col csvCol) (domain.Draft, error) {
 		ExternalSource: get(col.source),
 		ExternalID:     get(col.externalID),
 	}
+	if col.info >= 0 {
+		if err := json.Unmarshal([]byte(get(col.info)), &draft.Info); err != nil || draft.Info == nil {
+			return domain.Draft{}, invalid("info", -1)
+		}
+	}
 	if raw := get(col.year); raw != "" {
 		year, err := strconv.Atoi(raw)
 		if err != nil {
@@ -187,17 +202,15 @@ type importJSONBody struct {
 }
 
 type itemJSON struct {
-	ID             string  `json:"id"`
-	Title          string  `json:"title"`
-	OriginalTitle  string  `json:"originalTitle,omitempty"`
-	Type           string  `json:"type"`
-	Genre          string  `json:"genre,omitempty"`
-	ReleaseYear    *int    `json:"releaseYear,omitempty"`
-	PosterURL      string  `json:"posterUrl,omitempty"`
-	ReleaseStatus  string  `json:"releaseStatus"`
-	ExternalSource string  `json:"externalSource,omitempty"`
-	ExternalID     string  `json:"externalId,omitempty"`
-	CreatedBy      *string `json:"createdBy,omitempty"`
+	ID             string      `json:"id"`
+	Title          string      `json:"title"`
+	OriginalTitle  string      `json:"originalTitle,omitempty"`
+	Type           string      `json:"type"`
+	Info           domain.Info `json:"info"`
+	PosterURL      string      `json:"posterUrl,omitempty"`
+	ExternalSource string      `json:"externalSource,omitempty"`
+	ExternalID     string      `json:"externalId,omitempty"`
+	CreatedBy      *string     `json:"createdBy,omitempty"`
 }
 
 type listResponse struct {
@@ -223,10 +236,8 @@ func itemResponse(item ports.MediaObject) itemJSON {
 		Title:          item.Title,
 		OriginalTitle:  item.OriginalTitle,
 		Type:           item.Type,
-		Genre:          item.Genre,
-		ReleaseYear:    item.ReleaseYear,
+		Info:           item.Info,
 		PosterURL:      item.PosterURL,
-		ReleaseStatus:  item.ReleaseStatus,
 		ExternalSource: item.ExternalSource,
 		ExternalID:     item.ExternalID,
 	}

@@ -43,32 +43,34 @@ type Dependencies struct {
 }
 
 type Module struct {
-	listPrefs   *query.ListPrefsHandler
-	updatePrefs *command.UpdatePrefsHandler
-	listInbox   *query.ListInboxHandler
-	unread      *query.UnreadCountHandler
-	markRead    *command.MarkReadHandler
-	markAllRead *command.MarkAllReadHandler
-	voted       *consumer.VotedHandler
-	followed    *consumer.FollowedHandler
-	users       UserResolver
-	auth        echo.MiddlewareFunc
+	listPrefs       *query.ListPrefsHandler
+	updatePrefs     *command.UpdatePrefsHandler
+	listInbox       *query.ListInboxHandler
+	unread          *query.UnreadCountHandler
+	markRead        *command.MarkReadHandler
+	markAllRead     *command.MarkAllReadHandler
+	voted           *consumer.VotedHandler
+	followed        *consumer.FollowedHandler
+	followRequested *consumer.FollowRequestedHandler
+	users           UserResolver
+	auth            echo.MiddlewareFunc
 }
 
 func New(deps Dependencies) *Module {
 	repo := write.NewRepository(deps.Pool)
 	create := command.NewCreateNotificationHandler(repo, repo, deps.Users, deps.Users, deps.Bot, deps.Log)
 	return &Module{
-		listPrefs:   query.NewListPrefsHandler(repo),
-		updatePrefs: command.NewUpdatePrefsHandler(repo),
-		listInbox:   query.NewListInboxHandler(repo),
-		unread:      query.NewUnreadCountHandler(repo),
-		markRead:    command.NewMarkReadHandler(repo),
-		markAllRead: command.NewMarkAllReadHandler(repo),
-		voted:       consumer.NewVotedHandler(create, deps.Reviews),
-		followed:    consumer.NewFollowedHandler(create),
-		users:       deps.Users,
-		auth:        deps.Auth,
+		listPrefs:       query.NewListPrefsHandler(repo),
+		updatePrefs:     command.NewUpdatePrefsHandler(repo),
+		listInbox:       query.NewListInboxHandler(repo),
+		unread:          query.NewUnreadCountHandler(repo),
+		markRead:        command.NewMarkReadHandler(repo),
+		markAllRead:     command.NewMarkAllReadHandler(repo),
+		voted:           consumer.NewVotedHandler(create, deps.Reviews),
+		followed:        consumer.NewFollowedHandler(create),
+		followRequested: consumer.NewFollowRequestedHandler(create),
+		users:           deps.Users,
+		auth:            deps.Auth,
 	}
 }
 
@@ -86,6 +88,9 @@ func (m *Module) RegisterConsumers(d *eventbus.Dispatcher) {
 	}
 	if m.voted != nil {
 		d.Subscribe(reviewscontract.EventVoted, m.voted.Handle)
+	}
+	if m.followRequested != nil {
+		d.Subscribe(socialcontract.EventFollowRequested, m.followRequested.Handle)
 	}
 	if m.followed != nil {
 		d.Subscribe(socialcontract.EventFollowed, m.followed.Handle)

@@ -111,3 +111,26 @@ func (r *Repository) list(ctx context.Context, query string, subjectID, viewerID
 	}
 	return out, rows.Err()
 }
+
+func (r *Repository) FollowStatus(ctx context.Context, subjectID, viewerID uuid.UUID) (string, error) {
+	exists, err := r.UserExists(ctx, subjectID)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", contract.ErrNotFound
+	}
+	var status string
+	err = r.pool.QueryRow(ctx, `SELECT CASE
+ WHEN EXISTS(SELECT 1 FROM follows WHERE follower_id=$2 AND followee_id=$1) THEN 'following'
+ WHEN EXISTS(SELECT 1 FROM follow_requests WHERE follower_id=$2 AND followee_id=$1) THEN 'pending'
+ ELSE 'none' END`, subjectID, viewerID).Scan(&status)
+	return status, err
+}
+
+func (r *Repository) ListRequests(ctx context.Context, ownerID uuid.UUID, limit, offset int) ([]ports.FollowUser, error) {
+	return r.list(ctx, `SELECT u.id,COALESCE(u.username,''),COALESCE(u.photo_url,''),FALSE,f.created_at
+ FROM follow_requests f JOIN users u ON u.id=f.follower_id
+ WHERE f.followee_id=$1 AND $2::uuid=$1
+ ORDER BY f.created_at DESC,f.follower_id DESC LIMIT $3 OFFSET $4`, ownerID, ownerID, limit, offset)
+}

@@ -79,6 +79,31 @@ func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID, viewe
 	if mediaObjectID == uuid.Nil {
 		return nil, contract.FieldError{Field: "mediaObjectId"}
 	}
+	return r.listByMedia(ctx, mediaObjectID, viewerID, limit, false)
+}
+
+func (r *ReviewRepository) TopByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID) ([]ports.Review, error) {
+	if r == nil || r.pool == nil {
+		return nil, contract.ErrInvalid
+	}
+	if mediaObjectID == uuid.Nil {
+		return nil, contract.ErrNotFound
+	}
+	var exists bool
+	if err := r.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM media_objects WHERE id = $1)", mediaObjectID).Scan(&exists); err != nil {
+		return nil, fmt.Errorf("check media object: %w", err)
+	}
+	if !exists {
+		return nil, contract.ErrNotFound
+	}
+	return r.listByMedia(ctx, mediaObjectID, viewerID, 5, true)
+}
+
+func (r *ReviewRepository) listByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID, limit int, top bool) ([]ports.Review, error) {
+	order := "r.created_at DESC"
+	if top {
+		order = "r.likes_count DESC, r.created_at DESC, r.id DESC"
+	}
 	return r.list(ctx, `
 		SELECT r.id, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
@@ -93,7 +118,7 @@ func (r *ReviewRepository) ListByMedia(ctx context.Context, mediaObjectID, viewe
 		INNER JOIN users u ON u.id = r.author_id
 		LEFT JOIN gamification_profiles gp ON gp.user_id = r.author_id
 		WHERE r.media_object_id = $1 AND r.status = 'published'
-		ORDER BY r.created_at DESC
+		ORDER BY `+order+`
 		LIMIT $3
 	`, mediaObjectID, viewerID, limit)
 }

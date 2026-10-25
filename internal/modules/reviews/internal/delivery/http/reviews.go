@@ -143,11 +143,12 @@ func (h *Handler) UpdateReview(c echo.Context) error {
 }
 
 func (h *Handler) GetReview(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return httperr.New(http.StatusNotFound, "NOT_FOUND", "review not found")
 	}
-	viewerID, err := h.resolveUser(c)
+	viewerID, err := h.optionalUser(c)
 	if err != nil {
 		return err
 	}
@@ -452,4 +453,24 @@ func mapReviewError(err error) error {
 	default:
 		return err
 	}
+}
+
+func (h *Handler) TopReviews(c echo.Context) error {
+	mediaID, err := uuid.Parse(c.Param("id"))
+	if err != nil || mediaID == uuid.Nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "media object not found")
+	}
+	viewerID, err := h.optionalUser(c)
+	if err != nil {
+		return err
+	}
+	items, err := h.listReviews.TopByMedia(c.Request().Context(), mediaID, viewerID)
+	if errors.Is(err, contract.ErrNotFound) {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "media object not found")
+	}
+	if err != nil {
+		return mapReviewError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, reviewsListResponse{Items: reviewsResponse(items)})
 }

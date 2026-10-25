@@ -6,7 +6,7 @@ import (
 	"review-api/internal/http/httperr"
 )
 
-func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
+func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc, profileAccess ...echo.MiddlewareFunc) {
 	g.GET("/review-types", h.List)
 	g.GET("/review-statuses", h.Statuses)
 	g.GET("/report-reasons", h.ListReportReasons)
@@ -18,12 +18,14 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc) {
 		admin = denyUnauthorized
 	}
 	opt := optionalAuth(auth)
+	profileMiddleware := append([]echo.MiddlewareFunc{opt}, profileAccess...)
 
 	g.GET("/profile/reviews", h.ListMyReviews, auth)
-	g.GET("/profiles/:id/reviews", h.ListUserReviews, opt)
+	g.GET("/profiles/:id/reviews", h.ListUserReviews, profileMiddleware...)
 
+	g.GET("/media-objects/:id/top-reviews", h.TopReviews, opt)
 	g.GET("/reviews", h.ListReviews, opt)
-	g.GET("/reviews/:id", h.GetReview, auth)
+	g.GET("/reviews/:id", h.GetReview, opt)
 	g.POST("/reviews", h.CreateReview, auth)
 	g.PATCH("/reviews/:id", h.UpdateReview, auth)
 	g.DELETE("/reviews/:id", h.DeleteReview, auth)

@@ -1,10 +1,27 @@
 package domain
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 )
+
+func TestReviewBlockBodyHasNoLengthLimit(t *testing.T) {
+	for _, length := range []int{500, 501} {
+		draft := Draft{MediaObjectID: uuid.New(), Title: "Обзор", Rating: 5,
+			Blocks: []BlockDraft{{Title: "Блок", Body: strings.Repeat("я", length)}}}
+		_, err := NewReview(uuid.New(), draft)
+		if err != nil {
+			t.Fatalf("create length=%d: %v", length, err)
+		}
+		item := Review{Status: StatusDraft}
+		err = item.Apply(draft)
+		if err != nil {
+			t.Fatalf("update length=%d: %v", length, err)
+		}
+	}
+}
 
 func TestNewReview_rejectsMarkupAndEmpty(t *testing.T) {
 	author := uuid.New()

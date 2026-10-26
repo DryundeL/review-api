@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -15,6 +16,8 @@ import (
 	"review-api/internal/modules/reviews/internal/application/ports"
 	"review-api/internal/modules/reviews/internal/domain"
 )
+
+const maxBlockBodyLen = 500
 
 type reviewBody struct {
 	MediaObjectID string            `json:"mediaObjectId"`
@@ -332,6 +335,9 @@ func parseReviewDraft(body reviewBody, requireMedia bool) (domain.Draft, error) 
 	}
 	blocks := make([]domain.BlockDraft, 0, len(body.Blocks))
 	for _, b := range body.Blocks {
+		if utf8.RuneCountInString(b.Body) > maxBlockBodyLen {
+			return domain.Draft{}, contract.FieldError{Field: "blocks"}
+		}
 		blocks = append(blocks, domain.BlockDraft{Title: b.Title, Body: b.Body})
 	}
 	return domain.Draft{

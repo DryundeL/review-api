@@ -12,7 +12,6 @@ import (
 const (
 	maxReviewTitleLen = 256
 	maxBlockTitleLen  = 50
-	maxBlockBodyLen   = 256
 	maxBlocks         = 10
 	minRating         = 1
 	maxRating         = 10
@@ -188,7 +187,7 @@ func parseBlockTitle(value string) (string, error) {
 
 func parseBlockBody(value string) (string, error) {
 	value = sanitizeText(value)
-	if value == "" || utf8.RuneCountInString(value) > maxBlockBodyLen {
+	if value == "" {
 		return "", contract.FieldError{Field: "blocks"}
 	}
 	return value, nil

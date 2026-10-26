@@ -14,6 +14,7 @@ import (
 	notificationsmodule "review-api/internal/modules/notifications"
 	reviewsmodule "review-api/internal/modules/reviews"
 	searchmodule "review-api/internal/modules/search"
+	sitemapmodule "review-api/internal/modules/sitemap"
 	socialmodule "review-api/internal/modules/social"
 	usersmodule "review-api/internal/modules/users"
 	"review-api/internal/platform/ratelimit"
@@ -27,6 +28,7 @@ type APIModules struct {
 	Social        *socialmodule.Module
 	Feed          *feedmodule.Module
 	Search        *searchmodule.Module
+	Sitemap       *sitemapmodule.Module
 	Notifications *notificationsmodule.Module
 	Gamification  *gamificationmodule.Module
 }
@@ -65,6 +67,9 @@ func SetupAPIRoutes(e *echo.Echo, modules APIModules, opts APIOptions) {
 	}
 	if modules.Search != nil {
 		modules.Search.RegisterHTTP(v1)
+	}
+	if modules.Sitemap != nil {
+		modules.Sitemap.RegisterHTTP(v1)
 	}
 	if modules.Notifications != nil {
 		modules.Notifications.RegisterHTTP(v1)

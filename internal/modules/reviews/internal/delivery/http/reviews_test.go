@@ -13,10 +13,26 @@ import (
 
 func TestParseReviewDraftBlockBodyLength(t *testing.T) {
 	for _, requireMedia := range []bool{true, false} {
-		for _, text := range []string{strings.Repeat("я", 500), strings.Repeat("я", 501), strings.Repeat(" ", 501)} {
+		for _, tc := range []struct {
+			text  string
+			valid bool
+		}{
+			{strings.Repeat("я", 500), true},
+			{strings.Repeat("я", 501), false},
+			{strings.Repeat(" ", 501), false},
+			{"<p><strong>" + strings.Repeat("я", 500) + "</strong></p>", true},
+			{"<p>" + strings.Repeat("я", 501) + "</p>", false},
+			{strings.Repeat("<b>я</b>", 500), true},
+			{strings.Repeat("<b>я</b>", 501), false},
+			{strings.Repeat("&amp;", 500), true},
+			{strings.Repeat("&#128578;", 500), true},
+			{strings.Repeat("&amp;", 501), false},
+			{"<p>" + strings.Repeat("&lt;b&gt;", 167) + "</p>", false},
+		} {
+			text := tc.text
 			body := reviewBody{MediaObjectID: uuid.NewString(), Blocks: []reviewBlockBody{{Title: "Блок", Body: text}}}
 			_, err := parseReviewDraft(body, requireMedia)
-			if text == strings.Repeat("я", 500) {
+			if tc.valid {
 				if err != nil {
 					t.Fatalf("500 characters rejected: %v", err)
 				}

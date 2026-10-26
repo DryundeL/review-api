@@ -78,6 +78,7 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		Social:        modules.Social,
 		Feed:          modules.Feed,
 		Search:        modules.Search,
+		Sitemap:       modules.Sitemap,
 		Notifications: modules.Notifications,
 		Gamification:  modules.Gamification,
 	}, routes.APIOptions{

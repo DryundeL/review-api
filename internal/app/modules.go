@@ -17,6 +17,7 @@ import (
 	"review-api/internal/modules/reviews"
 	reviewscontract "review-api/internal/modules/reviews/contract"
 	"review-api/internal/modules/search"
+	"review-api/internal/modules/sitemap"
 	"review-api/internal/modules/social"
 	"review-api/internal/modules/users"
 	userscontract "review-api/internal/modules/users/contract"
@@ -33,6 +34,7 @@ type Modules struct {
 	Social        *social.Module
 	Feed          *feed.Module
 	Search        *search.Module
+	Sitemap       *sitemap.Module
 	Notifications *notifications.Module
 	Gamification  *gamification.Module
 }
@@ -114,6 +116,7 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 	return Modules{
 		Auth: authMod, Users: usersMod, Reviews: reviewsMod,
 		Catalog: catalogMod, Social: socialMod, Feed: feedMod, Search: searchMod,
+		Sitemap:       sitemap.New(sitemap.Dependencies{Pool: pool}),
 		Notifications: notificationsMod, Gamification: gamificationMod,
 	}
 }

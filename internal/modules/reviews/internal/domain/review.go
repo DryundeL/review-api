@@ -1,10 +1,13 @@
 package domain
 
 import (
+	"html"
+	"io"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	htmlparser "golang.org/x/net/html"
 
 	"review-api/internal/modules/reviews/contract"
 )
@@ -12,7 +15,6 @@ import (
 const (
 	maxReviewTitleLen = 256
 	maxBlockTitleLen  = 50
-	maxBlockBodyLen   = 256
 	maxBlocks         = 10
 	minRating         = 1
 	maxRating         = 10
@@ -187,11 +189,36 @@ func parseBlockTitle(value string) (string, error) {
 }
 
 func parseBlockBody(value string) (string, error) {
-	value = sanitizeText(value)
-	if value == "" || utf8.RuneCountInString(value) > maxBlockBodyLen {
+	value = strings.TrimSpace(strings.Map(dropControl, value))
+	if value == "" {
 		return "", contract.FieldError{Field: "blocks"}
 	}
-	return value, nil
+	var out strings.Builder
+	tokens := htmlparser.NewTokenizer(strings.NewReader(value))
+	for {
+		switch tokens.Next() {
+		case htmlparser.ErrorToken:
+			if tokens.Err() != io.EOF {
+				return "", contract.FieldError{Field: "blocks"}
+			}
+			return out.String(), nil
+		case htmlparser.TextToken:
+			out.WriteString(html.EscapeString(string(tokens.Text())))
+		case htmlparser.StartTagToken, htmlparser.EndTagToken, htmlparser.SelfClosingTagToken:
+			token := tokens.Token()
+			if len(token.Attr) != 0 {
+				return "", contract.FieldError{Field: "blocks"}
+			}
+			switch token.Data {
+			case "p", "br", "b", "strong", "i", "em", "u", "s", "ul", "ol", "li", "blockquote", "pre", "code", "span":
+				out.WriteString(token.String())
+			default:
+				return "", contract.FieldError{Field: "blocks"}
+			}
+		default:
+			return "", contract.FieldError{Field: "blocks"}
+		}
+	}
 }
 
 // sanitizeText trims, drops controls, rejects markup angle brackets (text/emoji/entities only).

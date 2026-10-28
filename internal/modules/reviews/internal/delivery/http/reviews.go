@@ -2,12 +2,16 @@ package reviewshttp
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"golang.org/x/net/html"
 
 	"review-api/internal/http/httperr"
 	authcontract "review-api/internal/modules/auth/contract"
@@ -15,6 +19,8 @@ import (
 	"review-api/internal/modules/reviews/internal/application/ports"
 	"review-api/internal/modules/reviews/internal/domain"
 )
+
+const maxBlockBodyLen = 500
 
 type reviewBody struct {
 	MediaObjectID string            `json:"mediaObjectId"`
@@ -332,6 +338,9 @@ func parseReviewDraft(body reviewBody, requireMedia bool) (domain.Draft, error) 
 	}
 	blocks := make([]domain.BlockDraft, 0, len(body.Blocks))
 	for _, b := range body.Blocks {
+		if !blockBodyWithinTextLimit(b.Body) {
+			return domain.Draft{}, contract.FieldError{Field: "blocks"}
+		}
 		blocks = append(blocks, domain.BlockDraft{Title: b.Title, Body: b.Body})
 	}
 	return domain.Draft{
@@ -341,6 +350,22 @@ func parseReviewDraft(body reviewBody, requireMedia bool) (domain.Draft, error) 
 		Status:        body.Status,
 		Blocks:        blocks,
 	}, nil
+}
+
+func blockBodyWithinTextLimit(body string) bool {
+	tokens := html.NewTokenizer(strings.NewReader(body))
+	length := 0
+	for {
+		switch tokens.Next() {
+		case html.ErrorToken:
+			return tokens.Err() == io.EOF
+		case html.TextToken:
+			length += utf8.RuneCount(tokens.Text())
+			if length > maxBlockBodyLen {
+				return false
+			}
+		}
+	}
 }
 
 func parseLimit(c echo.Context) int {

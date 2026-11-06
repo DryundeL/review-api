@@ -32,6 +32,7 @@ build.log
 Thumbs.db
 
 # Build artifacts
+/storage/
 bin/
 *.exe
 *.exe~

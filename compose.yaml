@@ -26,6 +26,13 @@ x-app: &app
 services:
   app:
     <<: *app
+    volumes:
+      - type: bind
+        source: ${STORAGE_HOST_PATH:-/home/wapp/apps/review-api/storage}
+        target: /app/storage
+        read_only: false
+        bind:
+          create_host_path: false
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:${APP_PORT:-8080}"
     depends_on:

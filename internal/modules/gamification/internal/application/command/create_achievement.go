@@ -53,7 +53,7 @@ func (h *CreateAchievementHandler) Handle(
 		_ = h.cache.Invalidate(ctx)
 	}
 	return ports.AchievementItem{
-		ID: item.ID, Code: item.Code, Title: item.Title, Description: item.Description,
+		ID: item.ID, Code: item.Code, URL: "/storage/achevments/" + item.Code + ".webp", Title: item.Title, Description: item.Description,
 		Metric: item.Metric, Target: item.Target, RewardPoints: item.RewardPoints,
 		IsActive: item.IsActive, SortOrder: item.SortOrder,
 	}, nil

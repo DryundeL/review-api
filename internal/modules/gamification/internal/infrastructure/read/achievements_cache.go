@@ -13,7 +13,7 @@ import (
 	"review-api/internal/modules/gamification/internal/application/ports"
 )
 
-const activeAchievementsKey = "gamification:achievements:active"
+const activeAchievementsKey = "gamification:achievements:active:v2"
 
 const ActiveAchievementsTTL = 5 * time.Minute
 

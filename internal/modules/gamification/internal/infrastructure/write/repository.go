@@ -46,11 +46,11 @@ func (r *Repository) UpdateItem(ctx context.Context, id uuid.UUID, title *string
 			sort_order = COALESCE($5, sort_order),
 			updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, code, kind, title, price, is_active, sort_order
+		RETURNING id, code, url, kind, title, price, is_active, sort_order
 	`
 	var item ports.ShopItem
 	err := r.queryRow(ctx, q, id, title, price, active, sortOrder).Scan(
-		&item.ID, &item.Code, &item.Kind, &item.Title, &item.Price, &item.IsActive, &item.SortOrder,
+		&item.ID, &item.Code, &item.URL, &item.Kind, &item.Title, &item.Price, &item.IsActive, &item.SortOrder,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ports.ShopItem{}, contract.ErrNotFound
@@ -63,12 +63,12 @@ func (r *Repository) UpdateItem(ctx context.Context, id uuid.UUID, title *string
 
 func (r *Repository) GetItem(ctx context.Context, id uuid.UUID) (ports.ShopItem, error) {
 	const q = `
-		SELECT id, code, kind, title, price, is_active, sort_order
+		SELECT id, code, url, kind, title, price, is_active, sort_order
 		FROM shop_items WHERE id = $1
 	`
 	var item ports.ShopItem
 	err := r.queryRow(ctx, q, id).Scan(
-		&item.ID, &item.Code, &item.Kind, &item.Title, &item.Price, &item.IsActive, &item.SortOrder,
+		&item.ID, &item.Code, &item.URL, &item.Kind, &item.Title, &item.Price, &item.IsActive, &item.SortOrder,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ports.ShopItem{}, contract.ErrNotFound
@@ -255,11 +255,11 @@ func (r *Repository) UpdateAchievement(
 			is_active = COALESCE($7, is_active),
 			updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, code, title, description, metric, target, reward_points, is_active, sort_order
+		RETURNING id, code, url, title, description, metric, target, reward_points, is_active, sort_order
 	`
 	var item ports.AchievementItem
 	err := r.queryRow(ctx, q, id, title, description, target, reward, sortOrder, active).Scan(
-		&item.ID, &item.Code, &item.Title, &item.Description, &item.Metric,
+		&item.ID, &item.Code, &item.URL, &item.Title, &item.Description, &item.Metric,
 		&item.Target, &item.RewardPoints, &item.IsActive, &item.SortOrder,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

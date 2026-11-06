@@ -82,3 +82,5 @@ go build ./cmd/api ./cmd/worker ./cmd/bot ./cmd/migrator
 ```sh
 TEST_DATABASE_URL='postgres://USER:PASSWORD@localhost:5432/TEST_DB?sslmode=disable' go test -race ./...
 ```
+
+Каталоги магазина и достижений возвращают поле `url`: `/storage/gemification/{code}.webp` и `/storage/achevments/{code}.webp` соответственно. Оно вычисляется БД из `code` (миграция `00025`), в том числе для новых записей; передавать `url` при создании или изменении не нужно. Поле `code` остаётся идентификатором для покупки и экипировки. Файлы `.webp` необходимо разместить по этим путям отдельно.

@@ -344,6 +344,7 @@ type updateAchievementBody struct {
 }
 
 type achievementResponse struct {
+	URL         string  `json:"url"`
 	Code        string  `json:"code"`
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
@@ -360,6 +361,7 @@ type achievementsListResponse struct {
 type adminAchievementResponse struct {
 	ID           string `json:"id"`
 	Code         string `json:"code"`
+	URL          string `json:"url"`
 	Title        string `json:"title"`
 	Description  string `json:"description"`
 	Metric       string `json:"metric"`
@@ -376,6 +378,7 @@ type adminAchievementsResponse struct {
 type itemResponse struct {
 	ID        string `json:"id"`
 	Code      string `json:"code"`
+	URL       string `json:"url"`
 	Kind      string `json:"kind"`
 	Title     string `json:"title"`
 	Price     int    `json:"price"`
@@ -403,7 +406,7 @@ func publicItems(items []ports.ShopItem) []itemResponse {
 	out := make([]itemResponse, 0, len(items))
 	for _, item := range items {
 		out = append(out, itemResponse{
-			ID: item.ID.String(), Code: item.Code, Kind: item.Kind,
+			ID: item.ID.String(), Code: item.Code, URL: item.URL, Kind: item.Kind,
 			Title: item.Title, Price: item.Price, SortOrder: item.SortOrder,
 		})
 	}
@@ -421,7 +424,7 @@ func adminItems(items []ports.ShopItem) []itemResponse {
 func adminItem(item ports.ShopItem) itemResponse {
 	active := item.IsActive
 	return itemResponse{
-		ID: item.ID.String(), Code: item.Code, Kind: item.Kind,
+		ID: item.ID.String(), Code: item.Code, URL: item.URL, Kind: item.Kind,
 		Title: item.Title, Price: item.Price, SortOrder: item.SortOrder, IsActive: &active,
 	}
 }
@@ -450,7 +453,7 @@ func progressItems(items []ports.AchievementProgress) []achievementResponse {
 	out := make([]achievementResponse, 0, len(items))
 	for _, item := range items {
 		out = append(out, achievementResponse{
-			Code: item.Code, Title: item.Title, Description: item.Description,
+			Code: item.Code, URL: item.URL, Title: item.Title, Description: item.Description,
 			Progress: query.ProgressPercent(item.Current, item.Target),
 			Current:  item.Current, Target: item.Target, UnlockedAt: item.UnlockedAt,
 		})
@@ -468,7 +471,7 @@ func adminAchievementItems(items []ports.AchievementItem) []adminAchievementResp
 
 func adminAchievementItem(item ports.AchievementItem) adminAchievementResponse {
 	return adminAchievementResponse{
-		ID: item.ID.String(), Code: item.Code, Title: item.Title, Description: item.Description,
+		ID: item.ID.String(), Code: item.Code, URL: item.URL, Title: item.Title, Description: item.Description,
 		Metric: item.Metric, Target: item.Target, RewardPoints: item.RewardPoints,
 		SortOrder: item.SortOrder, IsActive: item.IsActive,
 	}

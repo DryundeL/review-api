@@ -11,6 +11,7 @@ import (
 type ShopItem struct {
 	ID        uuid.UUID
 	Code      string
+	URL       string
 	Kind      string
 	Title     string
 	Price     int
@@ -62,6 +63,7 @@ type WalletReader interface {
 type AchievementItem struct {
 	ID           uuid.UUID
 	Code         string
+	URL          string
 	Title        string
 	Description  string
 	Metric       string

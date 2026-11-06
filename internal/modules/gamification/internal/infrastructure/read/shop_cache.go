@@ -12,7 +12,7 @@ import (
 	"review-api/internal/modules/gamification/internal/application/ports"
 )
 
-const activeCatalogKey = "gamification:shop:active"
+const activeCatalogKey = "gamification:shop:active:v2"
 
 // ActiveCatalogTTL is how long the public shop list may stay stale after a write
 // if invalidation is skipped (Redis blip). Writes still DEL the key.

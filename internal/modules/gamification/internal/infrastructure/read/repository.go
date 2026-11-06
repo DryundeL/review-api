@@ -24,7 +24,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) ListItems(ctx context.Context, activeOnly bool) ([]ports.ShopItem, error) {
 	q := `
-		SELECT id, code, kind, title, price, is_active, sort_order
+		SELECT id, code, url, kind, title, price, is_active, sort_order
 		FROM shop_items
 	`
 	if activeOnly {
@@ -39,7 +39,7 @@ func (r *Repository) ListItems(ctx context.Context, activeOnly bool) ([]ports.Sh
 	out := make([]ports.ShopItem, 0)
 	for rows.Next() {
 		var item ports.ShopItem
-		if err := rows.Scan(&item.ID, &item.Code, &item.Kind, &item.Title, &item.Price, &item.IsActive, &item.SortOrder); err != nil {
+		if err := rows.Scan(&item.ID, &item.Code, &item.URL, &item.Kind, &item.Title, &item.Price, &item.IsActive, &item.SortOrder); err != nil {
 			return nil, fmt.Errorf("scan shop item: %w", err)
 		}
 		out = append(out, item)
@@ -99,7 +99,7 @@ func (r *Repository) GetMe(ctx context.Context, userID uuid.UUID) (ports.Me, err
 
 func (r *Repository) ListAchievements(ctx context.Context, activeOnly bool) ([]ports.AchievementItem, error) {
 	q := `
-		SELECT id, code, title, description, metric, target, reward_points, is_active, sort_order
+		SELECT id, code, url, title, description, metric, target, reward_points, is_active, sort_order
 		FROM achievements
 	`
 	if activeOnly {
@@ -115,7 +115,7 @@ func (r *Repository) ListAchievements(ctx context.Context, activeOnly bool) ([]p
 	for rows.Next() {
 		var item ports.AchievementItem
 		if err := rows.Scan(
-			&item.ID, &item.Code, &item.Title, &item.Description, &item.Metric,
+			&item.ID, &item.Code, &item.URL, &item.Title, &item.Description, &item.Metric,
 			&item.Target, &item.RewardPoints, &item.IsActive, &item.SortOrder,
 		); err != nil {
 			return nil, fmt.Errorf("scan achievement: %w", err)
@@ -127,7 +127,7 @@ func (r *Repository) ListAchievements(ctx context.Context, activeOnly bool) ([]p
 
 func (r *Repository) ListProgress(ctx context.Context, userID uuid.UUID) ([]ports.AchievementProgress, error) {
 	const q = `
-		SELECT a.id, a.code, a.title, a.description, a.metric, a.target, a.reward_points, a.is_active, a.sort_order,
+		SELECT a.id, a.code, a.url, a.title, a.description, a.metric, a.target, a.reward_points, a.is_active, a.sort_order,
 			COALESCE(m.value, 0),
 			ua.unlocked_at
 		FROM achievements a
@@ -148,7 +148,7 @@ func (r *Repository) ListProgress(ctx context.Context, userID uuid.UUID) ([]port
 		var item ports.AchievementProgress
 		var unlockedAt *time.Time
 		if err := rows.Scan(
-			&item.ID, &item.Code, &item.Title, &item.Description, &item.Metric,
+			&item.ID, &item.Code, &item.URL, &item.Title, &item.Description, &item.Metric,
 			&item.Target, &item.RewardPoints, &item.IsActive, &item.SortOrder,
 			&item.Current, &unlockedAt,
 		); err != nil {

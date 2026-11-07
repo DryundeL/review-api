@@ -443,9 +443,9 @@ func meJSON(me ports.Me) meResponse {
 
 func equippedJSON(p ports.Profile) equippedResponse {
 	return equippedResponse{
-		Background:  p.EquippedBackground,
-		AvatarFrame: p.EquippedAvatarFrame,
-		Backdrop:    p.EquippedBackdrop,
+		Background:  contract.CosmeticURL(p.EquippedBackground),
+		AvatarFrame: contract.CosmeticURL(p.EquippedAvatarFrame),
+		Backdrop:    contract.CosmeticURL(p.EquippedBackdrop),
 	}
 }
 

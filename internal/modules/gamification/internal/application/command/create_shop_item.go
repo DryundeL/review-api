@@ -48,7 +48,7 @@ func (h *CreateShopItemHandler) Handle(ctx context.Context, code, kind, title st
 		_ = h.cache.Invalidate(ctx)
 	}
 	return ports.ShopItem{
-		ID: item.ID, Code: item.Code, URL: "/storage/gemification/" + item.Code + ".webp", Kind: item.Kind, Title: item.Title,
+		ID: item.ID, Code: item.Code, URL: contract.CosmeticURL(item.Code), Kind: item.Kind, Title: item.Title,
 		Price: item.Price, IsActive: item.IsActive, SortOrder: item.SortOrder,
 	}, nil
 }

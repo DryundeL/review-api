@@ -26,8 +26,8 @@ func (h *CosmeticsHandler) Handle(ctx context.Context, userID uuid.UUID) (contra
 		return contract.Cosmetics{}, err
 	}
 	return contract.Cosmetics{
-		Background:  p.EquippedBackground,
-		AvatarFrame: p.EquippedAvatarFrame,
-		Backdrop:    p.EquippedBackdrop,
+		Background:  contract.CosmeticURL(p.EquippedBackground),
+		AvatarFrame: contract.CosmeticURL(p.EquippedAvatarFrame),
+		Backdrop:    contract.CosmeticURL(p.EquippedBackdrop),
 	}, nil
 }

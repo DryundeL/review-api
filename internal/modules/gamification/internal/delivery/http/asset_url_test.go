@@ -36,3 +36,21 @@ func TestCatalogResponsesIncludeAssetURL(t *testing.T) {
 		})
 	}
 }
+
+func TestEquippedResponsesReturnImageURLs(t *testing.T) {
+	profile := ports.Profile{EquippedBackground: "background_blue", EquippedAvatarFrame: "frame_gold", EquippedBackdrop: "backdrop_stars"}
+	want := equippedResponse{Background: "/storage/gemification/background_blue.webp", AvatarFrame: "/storage/gemification/frame_gold.webp", Backdrop: "/storage/gemification/backdrop_stars.webp"}
+	if got := equippedJSON(profile); got != want {
+		t.Fatalf("equipped = %+v, want %+v", got, want)
+	}
+	if got := meJSON(ports.Me{Profile: profile}).Equipped; got != want {
+		t.Fatalf("me equipped = %+v, want %+v", got, want)
+	}
+	data, err := json.Marshal(equippedJSON(ports.Profile{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "{}" {
+		t.Fatalf("empty equipped = %s, want {}", data)
+	}
+}

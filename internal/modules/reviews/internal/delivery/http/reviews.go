@@ -15,6 +15,7 @@ import (
 
 	"review-api/internal/http/httperr"
 	authcontract "review-api/internal/modules/auth/contract"
+	gamificationcontract "review-api/internal/modules/gamification/contract"
 	"review-api/internal/modules/reviews/contract"
 	"review-api/internal/modules/reviews/internal/application/ports"
 	"review-api/internal/modules/reviews/internal/domain"
@@ -438,8 +439,8 @@ func authorResponse(a ports.AuthorRef) *authorJSON {
 		Username:    a.Username,
 		PhotoURL:    a.PhotoURL,
 		IsFollowing: a.IsFollowing,
-		AvatarFrame: a.AvatarFrame,
-		Backdrop:    a.Backdrop,
+		AvatarFrame: gamificationcontract.CosmeticURL(a.AvatarFrame),
+		Backdrop:    gamificationcontract.CosmeticURL(a.Backdrop),
 	}
 }
 

@@ -84,3 +84,7 @@ TEST_DATABASE_URL='postgres://USER:PASSWORD@localhost:5432/TEST_DB?sslmode=disab
 ```
 
 Каталоги магазина и достижений возвращают поле `url`: `/storage/gemification/{code}.webp` и `/storage/achevments/{code}.webp` соответственно. Оно вычисляется БД из `code` (миграция `00025`), в том числе для новых записей; передавать `url` при создании или изменении не нужно. Поле `code` остаётся идентификатором для покупки и экипировки. Файлы `.webp` необходимо разместить по этим путям отдельно.
+
+Поля `background`, `avatarFrame` и `backdrop` в `/v1/profile`, `/v1/profiles/:id`, а также в `equipped` ответа `/v1/gamification/me` и ответа `PUT /v1/gamification/equipped` содержат относительные URL `/storage/gemification/{code}.webp`. Невыбранные элементы не включаются в JSON. В запросе `PUT /v1/gamification/equipped` по-прежнему передаются коды.
+
+В ленте, списках и карточках обзоров `author.avatarFrame` и `author.backdrop` также возвращаются как относительные URL картинок.

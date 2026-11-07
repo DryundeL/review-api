@@ -14,6 +14,7 @@ import (
 	"review-api/internal/modules/feed/contract"
 	"review-api/internal/modules/feed/internal/application/ports"
 	"review-api/internal/modules/feed/internal/application/query"
+	gamificationcontract "review-api/internal/modules/gamification/contract"
 )
 
 type UserResolver interface {
@@ -131,8 +132,8 @@ func itemJSON(item ports.Item) feedItemJSON {
 			Username:    item.Author.Username,
 			PhotoURL:    item.Author.PhotoURL,
 			IsFollowing: item.Author.IsFollowing,
-			AvatarFrame: item.Author.AvatarFrame,
-			Backdrop:    item.Author.Backdrop,
+			AvatarFrame: gamificationcontract.CosmeticURL(item.Author.AvatarFrame),
+			Backdrop:    gamificationcontract.CosmeticURL(item.Author.Backdrop),
 		},
 		MediaObject:   mediaJSON(item.MediaObject),
 		Title:         item.Title,

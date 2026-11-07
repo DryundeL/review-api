@@ -83,8 +83,10 @@ go build ./cmd/api ./cmd/worker ./cmd/bot ./cmd/migrator
 TEST_DATABASE_URL='postgres://USER:PASSWORD@localhost:5432/TEST_DB?sslmode=disable' go test -race ./...
 ```
 
-Каталоги магазина и достижений возвращают поле `url`: `/storage/gemification/{code}.webp` и `/storage/achevments/{code}.webp` соответственно. Оно вычисляется БД из `code` (миграция `00025`), в том числе для новых записей; передавать `url` при создании или изменении не нужно. Поле `code` остаётся идентификатором для покупки и экипировки. Файлы `.webp` необходимо разместить по этим путям отдельно.
+Каталоги магазина и достижений возвращают поле `url`: `/storage/gamification/{code}.webp` и `/storage/achevments/{code}.webp` соответственно. Оно вычисляется БД из `code` (миграция `00025`), в том числе для новых записей; передавать `url` при создании или изменении не нужно. Поле `code` остаётся идентификатором для покупки и экипировки. Пути соответствуют существующим файлам `.webp`; перенос файлов и изменение прав не требуются.
 
-Поля `background`, `avatarFrame` и `backdrop` в `/v1/profile`, `/v1/profiles/:id`, а также в `equipped` ответа `/v1/gamification/me` и ответа `PUT /v1/gamification/equipped` содержат относительные URL `/storage/gemification/{code}.webp`. Невыбранные элементы не включаются в JSON. В запросе `PUT /v1/gamification/equipped` по-прежнему передаются коды.
+Поля `background`, `avatarFrame` и `backdrop` в `/v1/profile`, `/v1/profiles/:id`, а также в `equipped` ответа `/v1/gamification/me` и ответа `PUT /v1/gamification/equipped` содержат относительные URL `/storage/gamification/{code}.webp`. Невыбранные элементы не включаются в JSON. В запросе `PUT /v1/gamification/equipped` по-прежнему передаются коды.
 
 В ленте, списках и карточках обзоров `author.avatarFrame` и `author.backdrop` также возвращаются как относительные URL картинок.
+
+Миграция `00026` исправляет путь `shop_items.url` на `/storage/gamification/{code}.webp` для существующих и новых предметов. Её нужно применить перед запуском обновлённого API.

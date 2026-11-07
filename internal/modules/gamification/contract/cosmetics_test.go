@@ -4,7 +4,9 @@ import "testing"
 
 func TestCosmeticURL(t *testing.T) {
 	for _, tc := range []struct{ code, want string }{
-		{"frame_gold", "/storage/gemification/frame_gold.webp"},
+		{"bg_ivory_bloom", "/storage/gamification/bg_ivory_bloom.webp"},
+		{"frame_ivory", "/storage/gamification/frame_ivory.webp"},
+		{"list_bloom", "/storage/gamification/list_bloom.webp"},
 		{"", ""},
 		{"../secret", ""},
 		{"https://example.com/image.webp", ""},

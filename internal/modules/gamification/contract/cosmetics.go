@@ -17,5 +17,5 @@ func CosmeticURL(code string) string {
 	if !cosmeticCodeRe.MatchString(code) {
 		return ""
 	}
-	return "/storage/gemification/" + code + ".webp"
+	return "/storage/gamification/" + code + ".webp"
 }

@@ -22,7 +22,7 @@ func TestCosmeticsReturnsImageURLs(t *testing.T) {
 		profile ports.Profile
 		want    contract.Cosmetics
 	}{
-		{"equipped", ports.Profile{EquippedBackground: "background_blue", EquippedAvatarFrame: "frame_gold", EquippedBackdrop: "backdrop_stars"}, contract.Cosmetics{Background: "/storage/gemification/background_blue.webp", AvatarFrame: "/storage/gemification/frame_gold.webp", Backdrop: "/storage/gemification/backdrop_stars.webp"}},
+		{"equipped", ports.Profile{EquippedBackground: "background_blue", EquippedAvatarFrame: "frame_gold", EquippedBackdrop: "backdrop_stars"}, contract.Cosmetics{Background: "/storage/gamification/background_blue.webp", AvatarFrame: "/storage/gamification/frame_gold.webp", Backdrop: "/storage/gamification/backdrop_stars.webp"}},
 		{"defaults", ports.Profile{}, contract.Cosmetics{}},
 	}
 	for _, tc := range cases {

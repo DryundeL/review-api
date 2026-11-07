@@ -8,7 +8,7 @@ import (
 )
 
 func TestCatalogResponsesIncludeAssetURL(t *testing.T) {
-	shop := ports.ShopItem{Code: "frame_gold", URL: "/storage/gemification/frame_gold.webp"}
+	shop := ports.ShopItem{Code: "frame_gold", URL: "/storage/gamification/frame_gold.webp"}
 	achievement := ports.AchievementItem{Code: "first_review", URL: "/storage/achevments/first_review.webp"}
 	cases := []struct {
 		name     string
@@ -39,7 +39,7 @@ func TestCatalogResponsesIncludeAssetURL(t *testing.T) {
 
 func TestEquippedResponsesReturnImageURLs(t *testing.T) {
 	profile := ports.Profile{EquippedBackground: "background_blue", EquippedAvatarFrame: "frame_gold", EquippedBackdrop: "backdrop_stars"}
-	want := equippedResponse{Background: "/storage/gemification/background_blue.webp", AvatarFrame: "/storage/gemification/frame_gold.webp", Backdrop: "/storage/gemification/backdrop_stars.webp"}
+	want := equippedResponse{Background: "/storage/gamification/background_blue.webp", AvatarFrame: "/storage/gamification/frame_gold.webp", Backdrop: "/storage/gamification/backdrop_stars.webp"}
 	if got := equippedJSON(profile); got != want {
 		t.Fatalf("equipped = %+v, want %+v", got, want)
 	}

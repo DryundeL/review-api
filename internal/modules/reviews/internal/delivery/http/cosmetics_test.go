@@ -8,7 +8,7 @@ import (
 
 func TestReviewAuthorCosmeticsAreURLs(t *testing.T) {
 	got := authorResponse(ports.AuthorRef{ID: uuid.New(), AvatarFrame: "frame_gold", Backdrop: "backdrop_stars"})
-	if got.AvatarFrame != "/storage/gemification/frame_gold.webp" || got.Backdrop != "/storage/gemification/backdrop_stars.webp" {
+	if got.AvatarFrame != "/storage/gamification/frame_gold.webp" || got.Backdrop != "/storage/gamification/backdrop_stars.webp" {
 		t.Fatalf("author cosmetics = %+v", got)
 	}
 	empty := authorResponse(ports.AuthorRef{ID: uuid.New()})

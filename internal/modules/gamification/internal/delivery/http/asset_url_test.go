@@ -9,7 +9,7 @@ import (
 
 func TestCatalogResponsesIncludeAssetURL(t *testing.T) {
 	shop := ports.ShopItem{Code: "frame_gold", URL: "/storage/gamification/frame_gold.webp"}
-	achievement := ports.AchievementItem{Code: "first_review", URL: "/storage/achevments/first_review.webp"}
+	achievement := ports.AchievementItem{Code: "first_review", URL: "/storage/achievements/first_review.webp"}
 	cases := []struct {
 		name     string
 		response any

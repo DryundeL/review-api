@@ -19,6 +19,7 @@ var codePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 
 // ReviewType is one row of review_types. Code does not change after insert.
 type ReviewType struct {
+	ImageURL  string
 	Code      string
 	Label     string
 	SortOrder int

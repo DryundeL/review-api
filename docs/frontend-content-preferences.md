@@ -77,9 +77,9 @@ GET /v1/review-types
 ```json
 {
   "items": [
-    {"code": "manga", "label": "Манга", "sortOrder": 10},
-    {"code": "manhwa", "label": "Манхва", "sortOrder": 20},
-    {"code": "book", "label": "Книга", "sortOrder": 60}
+    {"code": "manga", "imageUrl": "/storage/review-types/manga.webp", "label": "Манга", "sortOrder": 10},
+    {"code": "manhwa", "imageUrl": "/storage/review-types/manhwa.webp", "label": "Манхва", "sortOrder": 20},
+    {"code": "book", "imageUrl": "/storage/review-types/book.webp", "label": "Книга", "sortOrder": 60}
   ]
 }
 ```

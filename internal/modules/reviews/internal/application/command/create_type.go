@@ -46,5 +46,5 @@ func (h *CreateTypeHandler) Handle(ctx context.Context, code, label string, sort
 }
 
 func toType(item domain.ReviewType) ports.Type {
-	return ports.Type{Code: item.Code, Label: item.Label, SortOrder: item.SortOrder, IsActive: item.IsActive}
+	return ports.Type{ImageURL: item.ImageURL, Code: item.Code, Label: item.Label, SortOrder: item.SortOrder, IsActive: item.IsActive}
 }

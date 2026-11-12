@@ -43,11 +43,11 @@ func (r *Repository) Update(ctx context.Context, code string, label *string, sor
 			is_active = COALESCE($4, is_active),
 			updated_at = NOW()
 		WHERE code = $1
-		RETURNING code, label, sort_order, is_active
+		RETURNING code, label, sort_order, is_active, image_url
 	`
 	var item domain.ReviewType
 	err := r.queryRow(ctx, query, code, label, sortOrder, active).Scan(
-		&item.Code, &item.Label, &item.SortOrder, &item.IsActive,
+		&item.Code, &item.Label, &item.SortOrder, &item.IsActive, &item.ImageURL,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ReviewType{}, contract.ErrNotFound

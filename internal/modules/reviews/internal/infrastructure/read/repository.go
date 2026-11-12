@@ -23,7 +23,7 @@ func (r *Repository) List(ctx context.Context, activeOnly bool) ([]ports.Type, e
 		return nil, contract.ErrNotFound
 	}
 	const query = `
-		SELECT code, label, sort_order, is_active
+		SELECT code, label, sort_order, is_active, image_url
 		FROM review_types
 		WHERE NOT $1::bool OR is_active
 		ORDER BY sort_order, code
@@ -37,7 +37,7 @@ func (r *Repository) List(ctx context.Context, activeOnly bool) ([]ports.Type, e
 	out := make([]ports.Type, 0)
 	for rows.Next() {
 		var item ports.Type
-		if err := rows.Scan(&item.Code, &item.Label, &item.SortOrder, &item.IsActive); err != nil {
+		if err := rows.Scan(&item.Code, &item.Label, &item.SortOrder, &item.IsActive, &item.ImageURL); err != nil {
 			return nil, fmt.Errorf("scan review type: %w", err)
 		}
 		out = append(out, item)

@@ -155,6 +155,7 @@ func (b typeBody) LabelPtr() *string {
 }
 
 type typeResponse struct {
+	ImageURL  string `json:"imageUrl"`
 	Code      string `json:"code"`
 	Label     string `json:"label"`
 	SortOrder int    `json:"sortOrder"`
@@ -178,7 +179,7 @@ type statusesResponse struct {
 func publicTypes(items []ports.Type) []typeResponse {
 	out := make([]typeResponse, 0, len(items))
 	for _, item := range items {
-		out = append(out, typeResponse{Code: item.Code, Label: item.Label, SortOrder: item.SortOrder})
+		out = append(out, typeResponse{ImageURL: item.ImageURL, Code: item.Code, Label: item.Label, SortOrder: item.SortOrder})
 	}
 	return out
 }
@@ -193,7 +194,7 @@ func adminTypes(items []ports.Type) []typeResponse {
 
 func adminType(item ports.Type) typeResponse {
 	active := item.IsActive
-	return typeResponse{Code: item.Code, Label: item.Label, SortOrder: item.SortOrder, IsActive: &active}
+	return typeResponse{ImageURL: item.ImageURL, Code: item.Code, Label: item.Label, SortOrder: item.SortOrder, IsActive: &active}
 }
 
 func statusItems(items []StatusItem) []statusItem {

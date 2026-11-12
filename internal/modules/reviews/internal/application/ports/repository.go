@@ -11,6 +11,7 @@ import (
 
 // Type is a review_types row returned to the API.
 type Type struct {
+	ImageURL  string
 	Code      string
 	Label     string
 	SortOrder int

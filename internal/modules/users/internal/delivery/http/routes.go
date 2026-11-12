@@ -16,6 +16,8 @@ func Register(g *echo.Group, h *Handler, auth echo.MiddlewareFunc) {
 	}
 	g.GET("/profile", h.Profile, auth)
 	g.GET("/profiles/:id", h.PublicProfile, optionalAuth(auth))
+	g.GET("/content-preferences", h.GetContentPreferences, auth)
+	g.PUT("/content-preferences", h.PutContentPreferences, auth)
 	g.GET("/settings", h.GetSettings, auth)
 	g.PATCH("/settings", h.PatchSettings, auth)
 	g.POST("/email", h.StartEmail, auth)

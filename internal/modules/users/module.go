@@ -35,6 +35,7 @@ type Dependencies struct {
 }
 
 type Module struct {
+	content        *command.ContentPreferencesHandler
 	ensure         *command.EnsureUserHandler
 	profile        *query.GetProfileHandler
 	profiles       ports.ProfileReader
@@ -52,6 +53,7 @@ func New(deps Dependencies) *Module {
 	readRepo := read.NewRepository(deps.Pool)
 	codes := &challengeAdapter{store: authcode.New(deps.Redis, []byte(deps.AuthSecret), "users:email")}
 	return &Module{
+		content:        command.NewContentPreferencesHandler(writeRepo),
 		ensure:         command.NewEnsureUserHandler(writeRepo, nil),
 		profile:        query.NewGetProfileHandler(readRepo),
 		getSettings:    query.NewGetSettingsHandler(writeRepo),
@@ -162,6 +164,7 @@ func (m *Module) SetCosmetics(c CosmeticsLookup) {
 func (m *Module) RegisterHTTP(g *echo.Group) {
 	handler := usershttp.NewHandler(m.profile, m.getSettings, m.updateSettings, m, m.cosmetics)
 	handler.SetEmailHandler(m.email)
+	handler.SetContentPreferences(m.content)
 	usershttp.Register(g, handler, m.auth)
 }
 

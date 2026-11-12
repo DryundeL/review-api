@@ -25,6 +25,7 @@ type EmailRepository interface {
 
 // ProfileCard is a user row plus follow stats for profile screens.
 type ProfileCard struct {
+	NeedsOnboarding  bool
 	FollowStatus     string
 	IsProfilePrivate bool
 	User             domain.User

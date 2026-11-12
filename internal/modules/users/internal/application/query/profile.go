@@ -12,6 +12,7 @@ import (
 
 // Card is the profile payload for HTTP (own or public).
 type Card struct {
+	NeedsOnboarding  bool
 	FollowStatus     string
 	IsProfilePrivate bool
 	User             domain.User
@@ -46,6 +47,7 @@ func (h *GetProfileHandler) Own(ctx context.Context, telegramID int64) (Card, er
 	}
 	return Card{
 		User:             card.User,
+		NeedsOnboarding:  card.NeedsOnboarding,
 		IsProfilePrivate: card.IsProfilePrivate,
 		FollowStatus:     card.FollowStatus,
 		FollowersCount:   card.FollowersCount,
@@ -70,6 +72,7 @@ func (h *GetProfileHandler) ByID(ctx context.Context, userID, viewerID uuid.UUID
 	isFollowing := card.IsFollowing && !isMe
 	return Card{
 		User:             card.User,
+		NeedsOnboarding:  card.NeedsOnboarding,
 		IsProfilePrivate: card.IsProfilePrivate,
 		FollowStatus:     card.FollowStatus,
 		FollowersCount:   card.FollowersCount,

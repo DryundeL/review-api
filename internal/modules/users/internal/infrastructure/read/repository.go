@@ -51,6 +51,7 @@ func (r *Repository) FindCardByID(ctx context.Context, userID, viewerID uuid.UUI
 			u.is_premium,
 			COALESCE(u.photo_url, ''),
 			COALESCE(u.email, ''),
+ NOT EXISTS (SELECT 1 FROM user_content_preferences p WHERE p.user_id = u.id),
 			CASE
 				WHEN EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = u.id) THEN 'following'
 				WHEN EXISTS (SELECT 1 FROM follow_requests WHERE follower_id = $2 AND followee_id = u.id) THEN 'pending'
@@ -82,6 +83,7 @@ func (r *Repository) FindCardByTelegramID(ctx context.Context, telegramID int64,
 			u.is_premium,
 			COALESCE(u.photo_url, ''),
 			COALESCE(u.email, ''),
+ NOT EXISTS (SELECT 1 FROM user_content_preferences p WHERE p.user_id = u.id),
 			CASE
 				WHEN EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = u.id) THEN 'following'
 				WHEN EXISTS (SELECT 1 FROM follow_requests WHERE follower_id = $2 AND followee_id = u.id) THEN 'pending'
@@ -112,6 +114,7 @@ func (r *Repository) scanCard(row pgx.Row) (ports.ProfileCard, error) {
 		&card.User.IsPremium,
 		&card.User.PhotoURL,
 		&card.User.Email,
+		&card.NeedsOnboarding,
 		&card.FollowStatus,
 		&card.IsProfilePrivate,
 		&card.FollowersCount,

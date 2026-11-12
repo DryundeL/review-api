@@ -27,6 +27,7 @@ type CosmeticsLookup interface {
 }
 
 type Handler struct {
+	content   *command.ContentPreferencesHandler
 	profile   *query.GetProfileHandler
 	settings  *query.GetSettingsHandler
 	update    *command.UpdateSettingsHandler
@@ -208,6 +209,7 @@ func (h *Handler) optionalViewer(c echo.Context) (uuid.UUID, error) {
 }
 
 type profileResponse struct {
+	NeedsOnboarding  *bool  `json:"needsOnboarding,omitempty"`
 	FollowStatus     string `json:"followStatus"`
 	IsProfilePrivate bool   `json:"isProfilePrivate"`
 	ID               string `json:"id"`
@@ -261,6 +263,7 @@ func (h *Handler) profileJSON(ctx context.Context, card query.Card, includePriva
 		}
 	}
 	if includePrivate {
+		out.NeedsOnboarding = &card.NeedsOnboarding
 		tid := card.User.TelegramID
 		prem := card.User.IsPremium
 		out.TelegramID = &tid

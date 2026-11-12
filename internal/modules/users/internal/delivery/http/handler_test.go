@@ -19,11 +19,12 @@ import (
 )
 
 type stubProfiles struct {
-	private     bool
-	user        domain.User
-	followers   int64
-	following   int64
-	isFollowing bool
+	needsOnboarding bool
+	private         bool
+	user            domain.User
+	followers       int64
+	following       int64
+	isFollowing     bool
 }
 
 func (s stubProfiles) FindByTelegramID(context.Context, int64) (domain.User, error) {
@@ -43,7 +44,7 @@ func (s stubProfiles) FindCardByID(_ context.Context, userID, viewerID uuid.UUID
 	}
 	following := s.isFollowing && viewerID != uuid.Nil && viewerID != s.user.ID
 	return ports.ProfileCard{
-		IsProfilePrivate: s.private, User: s.user, FollowersCount: s.followers, FollowingCount: s.following, IsFollowing: following,
+		NeedsOnboarding: s.needsOnboarding, IsProfilePrivate: s.private, User: s.user, FollowersCount: s.followers, FollowingCount: s.following, IsFollowing: following,
 	}, nil
 }
 
@@ -51,7 +52,7 @@ func (s stubProfiles) FindCardByTelegramID(_ context.Context, telegramID int64, 
 	if telegramID != s.user.TelegramID {
 		return ports.ProfileCard{}, contract.ErrNotFound
 	}
-	return ports.ProfileCard{IsProfilePrivate: s.private, User: s.user, FollowersCount: s.followers, FollowingCount: s.following}, nil
+	return ports.ProfileCard{NeedsOnboarding: s.needsOnboarding, IsProfilePrivate: s.private, User: s.user, FollowersCount: s.followers, FollowingCount: s.following}, nil
 }
 
 type stubUsers struct {
@@ -70,7 +71,7 @@ func TestProfile(t *testing.T) {
 			ID: uid, TelegramID: 42, Username: "ann", FirstName: "Ann",
 			PhotoURL: "https://t.me/i/userpic/320/ann.jpg", Email: "ann@example.com",
 		},
-		followers: 3, following: 1,
+		followers: 3, following: 1, needsOnboarding: true,
 	}), nil, nil, stubUsers{id: uid}, nil)
 	e := echo.New()
 	e.HTTPErrorHandler = httpserver.ErrorHandler
@@ -91,6 +92,9 @@ func TestProfile(t *testing.T) {
 	var body profileResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
+	}
+	if body.NeedsOnboarding == nil || !*body.NeedsOnboarding {
+		t.Fatalf("needsOnboarding = %v", body.NeedsOnboarding)
 	}
 	if !body.IsMe || body.FollowersCount != 3 || body.FollowingCount != 1 || body.TelegramID == nil || *body.TelegramID != 42 {
 		t.Fatalf("body = %+v", body)
@@ -221,5 +225,26 @@ func TestPrivateProfileAccess(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestProfileOnboardingVisibility(t *testing.T) {
+	for _, needs := range []bool{true, false} {
+		for _, own := range []bool{true, false} {
+			h := &Handler{}
+			out := h.profileJSON(context.Background(), query.Card{NeedsOnboarding: needs}, own)
+			data, err := json.Marshal(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var body map[string]any
+			if err := json.Unmarshal(data, &body); err != nil {
+				t.Fatal(err)
+			}
+			value, present := body["needsOnboarding"]
+			if present != own || (own && value != needs) {
+				t.Fatalf("own=%v needs=%v body=%s", own, needs, data)
+			}
+		}
 	}
 }

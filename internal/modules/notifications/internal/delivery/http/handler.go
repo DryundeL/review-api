@@ -194,14 +194,16 @@ type patchBody struct {
 }
 
 type inboxItemJSON struct {
-	ID        string  `json:"id"`
-	Type      string  `json:"type"`
-	Title     string  `json:"title"`
-	Body      string  `json:"body"`
-	ActorID   *string `json:"actorId,omitempty"`
-	ReviewID  *string `json:"reviewId,omitempty"`
-	IsRead    bool    `json:"isRead"`
-	CreatedAt string  `json:"createdAt"`
+	CommentID       *uuid.UUID `json:"commentId,omitempty"`
+	ParentCommentID *uuid.UUID `json:"parentCommentId"`
+	ID              string     `json:"id"`
+	Type            string     `json:"type"`
+	Title           string     `json:"title"`
+	Body            string     `json:"body"`
+	ActorID         *string    `json:"actorId,omitempty"`
+	ReviewID        *string    `json:"reviewId,omitempty"`
+	IsRead          bool       `json:"isRead"`
+	CreatedAt       string     `json:"createdAt"`
 }
 
 type inboxListResponse struct {
@@ -226,12 +228,14 @@ func inboxJSON(items []ports.Notification) []inboxItemJSON {
 	out := make([]inboxItemJSON, 0, len(items))
 	for _, item := range items {
 		row := inboxItemJSON{
-			ID:        item.ID.String(),
-			Type:      item.TypeName,
-			Title:     item.Title,
-			Body:      item.Body,
-			IsRead:    item.ReadAt != nil,
-			CreatedAt: item.CreatedAt.UTC().Format(time.RFC3339),
+			ID:              item.ID.String(),
+			CommentID:       item.CommentID,
+			ParentCommentID: item.ParentCommentID,
+			Type:            item.TypeName,
+			Title:           item.Title,
+			Body:            item.Body,
+			IsRead:          item.ReadAt != nil,
+			CreatedAt:       item.CreatedAt.UTC().Format(time.RFC3339),
 		}
 		if item.ActorID != nil {
 			s := item.ActorID.String()

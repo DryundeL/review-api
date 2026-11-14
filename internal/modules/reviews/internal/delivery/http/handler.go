@@ -33,6 +33,9 @@ type UserResolver interface {
 }
 
 type Handler struct {
+	createComment *command.CreateCommentHandler
+	listComments  *query.ListCommentsHandler
+
 	list         *query.ListTypesHandler
 	create       *command.CreateTypeHandler
 	update       *command.UpdateTypeHandler
@@ -50,6 +53,9 @@ type Handler struct {
 }
 
 type HandlerDeps struct {
+	CreateComment *command.CreateCommentHandler
+	ListComments  *query.ListCommentsHandler
+
 	ListTypes    *query.ListTypesHandler
 	CreateType   *command.CreateTypeHandler
 	UpdateType   *command.UpdateTypeHandler
@@ -68,6 +74,9 @@ type HandlerDeps struct {
 
 func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
+		createComment: deps.CreateComment,
+		listComments:  deps.ListComments,
+
 		list:         deps.ListTypes,
 		create:       deps.CreateType,
 		update:       deps.UpdateType,

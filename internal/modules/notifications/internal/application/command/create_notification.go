@@ -52,6 +52,8 @@ func NewCreateNotificationHandler(
 }
 
 type CreateInput struct {
+	CommentID       *uuid.UUID
+	ParentCommentID *uuid.UUID
 	// NotificationID is stable across event retries; zero generates a new ID.
 	NotificationID uuid.UUID
 	RecipientID    uuid.UUID
@@ -91,14 +93,16 @@ func (h *CreateNotificationHandler) Handle(ctx context.Context, in CreateInput) 
 		id = uuid.New()
 	}
 	item := ports.Notification{
-		ID:        id,
-		UserID:    in.RecipientID,
-		TypeName:  meta.Name,
-		Title:     meta.Title,
-		Body:      body,
-		ActorID:   &in.ActorID,
-		ReviewID:  in.ReviewID,
-		CreatedAt: h.now().UTC(),
+		ID:              id,
+		CommentID:       in.CommentID,
+		ParentCommentID: in.ParentCommentID,
+		UserID:          in.RecipientID,
+		TypeName:        meta.Name,
+		Title:           meta.Title,
+		Body:            body,
+		ActorID:         &in.ActorID,
+		ReviewID:        in.ReviewID,
+		CreatedAt:       h.now().UTC(),
 	}
 	inserted, err := h.inbox.Insert(ctx, item)
 	if err != nil {

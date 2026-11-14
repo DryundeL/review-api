@@ -26,6 +26,7 @@ type UserResolver interface {
 }
 
 type ReviewLookup interface {
+	CommentNotificationRef(context.Context, uuid.UUID) (reviewscontract.CommentNotificationRef, error)
 	PublishedReviewRef(ctx context.Context, reviewID uuid.UUID) (reviewscontract.ReviewRef, error)
 }
 
@@ -43,6 +44,7 @@ type Dependencies struct {
 }
 
 type Module struct {
+	commentCreated  *consumer.CommentCreatedHandler
 	listPrefs       *query.ListPrefsHandler
 	updatePrefs     *command.UpdatePrefsHandler
 	listInbox       *query.ListInboxHandler
@@ -60,6 +62,7 @@ func New(deps Dependencies) *Module {
 	repo := write.NewRepository(deps.Pool)
 	create := command.NewCreateNotificationHandler(repo, repo, deps.Users, deps.Users, deps.Bot, deps.Log)
 	return &Module{
+		commentCreated:  consumer.NewCommentCreatedHandler(create, deps.Reviews),
 		listPrefs:       query.NewListPrefsHandler(repo),
 		updatePrefs:     command.NewUpdatePrefsHandler(repo),
 		listInbox:       query.NewListInboxHandler(repo),
@@ -85,6 +88,9 @@ func (m *Module) RegisterHTTP(g *echo.Group) {
 func (m *Module) RegisterConsumers(d *eventbus.Dispatcher) {
 	if m == nil || d == nil {
 		return
+	}
+	if m.commentCreated != nil {
+		d.Subscribe(reviewscontract.EventCommentCreated, m.commentCreated.Handle)
 	}
 	if m.voted != nil {
 		d.Subscribe(reviewscontract.EventVoted, m.voted.Handle)

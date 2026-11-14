@@ -31,6 +31,10 @@ type Dependencies struct {
 }
 
 type Module struct {
+	createComment *command.CreateCommentHandler
+	listComments  *query.ListCommentsHandler
+	comments      *read.ReviewRepository
+
 	list         *query.ListTypesHandler
 	create       *command.CreateTypeHandler
 	update       *command.UpdateTypeHandler
@@ -61,6 +65,10 @@ func New(deps Dependencies) *Module {
 		threshold = 10
 	}
 	return &Module{
+		createComment: command.NewCreateCommentHandler(reviewWriter, reviewReader, tx, pub),
+		listComments:  query.NewListCommentsHandler(reviewReader),
+		comments:      reviewReader,
+
 		list:         query.NewListTypesHandler(typeReader),
 		create:       command.NewCreateTypeHandler(typeWriter),
 		update:       command.NewUpdateTypeHandler(typeWriter),
@@ -125,6 +133,9 @@ func (m *Module) Name() string { return "reviews" }
 
 func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) {
 	reviewshttp.Register(g, reviewshttp.NewHandler(reviewshttp.HandlerDeps{
+		CreateComment: m.createComment,
+		ListComments:  m.listComments,
+
 		ListTypes:    m.list,
 		CreateType:   m.create,
 		UpdateType:   m.update,
@@ -140,4 +151,8 @@ func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) 
 		CreateReport: m.createReport,
 		Users:        m.users,
 	}), m.admin, m.auth, profileAccess)
+}
+
+func (m *Module) CommentNotificationRef(ctx context.Context, commentID uuid.UUID) (contract.CommentNotificationRef, error) {
+	return m.comments.CommentNotificationRef(ctx, commentID)
 }

@@ -4,6 +4,9 @@ Telegram Mini App backend. Modular monolith: форма модуля как `ana
 
 Карта: [CAPABILITY-MAP.md](CAPABILITY-MAP.md).
 
+Комментарии с вложенными ответами, курсорной загрузкой и уведомлениями:
+[контракт для фронтенда](docs/frontend-comments.md).
+
 ## Docker и сервер
 
 Настройка пользователя `wapp`, переменных окружения, запуск и откат:

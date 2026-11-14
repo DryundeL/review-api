@@ -22,7 +22,9 @@ func (f *createFake) EnsureDefaults(context.Context, uuid.UUID) error { return n
 func (f *createFake) List(context.Context, uuid.UUID) ([]ports.PrefItem, error) {
 	return nil, nil
 }
-func (f *createFake) Patch(context.Context, uuid.UUID, *bool, *bool, *bool) error { return nil }
+func (f *createFake) Patch(context.Context, uuid.UUID, *bool, *bool, *bool, *bool, *bool) error {
+	return nil
+}
 func (f *createFake) TypeEnabled(_ context.Context, _ uuid.UUID, name string) (bool, error) {
 	if name == "like" {
 		return f.likeEnabled, nil

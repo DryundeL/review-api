@@ -1,6 +1,9 @@
 package domain
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // RenderBody appends dynamic actor/review details to the type template text.
 func RenderBody(baseText, actorLabel, reviewTitle string) string {
@@ -27,7 +30,11 @@ func RenderBody(baseText, actorLabel, reviewTitle string) string {
 	}
 	out := b.String()
 	if len(out) > 512 {
-		return out[:512]
+		end := 512
+		for !utf8.RuneStart(out[end]) {
+			end--
+		}
+		return out[:end]
 	}
 	return out
 }

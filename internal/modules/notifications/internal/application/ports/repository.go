@@ -22,7 +22,7 @@ type PrefPatch struct {
 type PrefRepository interface {
 	EnsureDefaults(ctx context.Context, userID uuid.UUID) error
 	List(ctx context.Context, userID uuid.UUID) ([]PrefItem, error)
-	Patch(ctx context.Context, userID uuid.UUID, like, follow, followRequest *bool) error
+	Patch(ctx context.Context, userID uuid.UUID, like, follow, followRequest, comment, commentReply *bool) error
 	TypeEnabled(ctx context.Context, userID uuid.UUID, name string) (bool, error)
 	TypeMeta(ctx context.Context, name string) (TypeMeta, error)
 }
@@ -34,15 +34,17 @@ type TypeMeta struct {
 }
 
 type Notification struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	TypeName  string
-	Title     string
-	Body      string
-	ActorID   *uuid.UUID
-	ReviewID  *uuid.UUID
-	ReadAt    *time.Time
-	CreatedAt time.Time
+	CommentID       *uuid.UUID
+	ParentCommentID *uuid.UUID
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	TypeName        string
+	Title           string
+	Body            string
+	ActorID         *uuid.UUID
+	ReviewID        *uuid.UUID
+	ReadAt          *time.Time
+	CreatedAt       time.Time
 }
 
 type InboxRepository interface {

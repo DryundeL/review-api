@@ -27,6 +27,8 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc, profil
 	g.GET("/reviews", h.ListReviews, opt)
 	g.GET("/reviews/:id", h.GetReview, opt)
 	g.POST("/reviews", h.CreateReview, auth)
+	g.GET("/reviews/:id/comments", h.ListComments, opt)
+	g.POST("/reviews/:id/comments", h.CreateComment, auth)
 	g.PATCH("/reviews/:id", h.UpdateReview, auth)
 	g.DELETE("/reviews/:id", h.DeleteReview, auth)
 	g.PUT("/reviews/:id/vote", h.VoteReview, auth)

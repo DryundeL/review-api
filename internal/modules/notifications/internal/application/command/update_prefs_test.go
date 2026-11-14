@@ -12,6 +12,8 @@ import (
 )
 
 type fakePrefs struct {
+	comment       bool
+	commentReply  bool
 	like          bool
 	follow        bool
 	followRequest bool
@@ -31,7 +33,13 @@ func (f *fakePrefs) List(_ context.Context, _ uuid.UUID) ([]ports.PrefItem, erro
 	}, nil
 }
 
-func (f *fakePrefs) Patch(_ context.Context, _ uuid.UUID, like, follow, followRequest *bool) error {
+func (f *fakePrefs) Patch(_ context.Context, _ uuid.UUID, like, follow, followRequest, comment, commentReply *bool) error {
+	if comment != nil {
+		f.comment = *comment
+	}
+	if commentReply != nil {
+		f.commentReply = *commentReply
+	}
 	if like != nil {
 		f.like = *like
 	}
@@ -65,7 +73,7 @@ func TestUpdatePrefsRejectsUnknownType(t *testing.T) {
 	t.Parallel()
 	h := NewUpdatePrefsHandler(&fakePrefs{like: true, follow: true})
 	_, err := h.Handle(context.Background(), uuid.New(), []ports.PrefPatch{
-		{Name: "comment", Enabled: false},
+		{Name: "unknown", Enabled: false},
 	})
 	var field contract.FieldError
 	if !errors.As(err, &field) || field.Field != "name" {
@@ -92,6 +100,19 @@ func TestUpdateFollowRequestPreference(t *testing.T) {
 	repo := &fakePrefs{like: true, follow: true, followRequest: true}
 	_, err := NewUpdatePrefsHandler(repo).Handle(context.Background(), uuid.New(), []ports.PrefPatch{{Name: "follow_request", Enabled: false}})
 	if err != nil || repo.followRequest || !repo.follow || !repo.like {
+		t.Fatalf("prefs=%+v err=%v", repo, err)
+	}
+}
+
+func TestUpdateCommentPreferences(t *testing.T) {
+	repo := &fakePrefs{like: true, follow: true, comment: true, commentReply: true}
+	h := NewUpdatePrefsHandler(repo)
+	_, err := h.Handle(context.Background(), uuid.New(), []ports.PrefPatch{{Name: "comment", Enabled: false}})
+	if err != nil || repo.comment || !repo.commentReply || !repo.like || !repo.follow {
+		t.Fatalf("prefs=%+v err=%v", repo, err)
+	}
+	_, err = h.Handle(context.Background(), uuid.New(), []ports.PrefPatch{{Name: "comment_reply", Enabled: false}})
+	if err != nil || repo.comment || repo.commentReply {
 		t.Fatalf("prefs=%+v err=%v", repo, err)
 	}
 }

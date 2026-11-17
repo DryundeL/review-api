@@ -12,12 +12,16 @@ permissions:
 
 concurrency:
   group: review-api-${{ github.ref }}
-  cancel-in-progress: false
+  # Superseded PR runs are useless; never interrupt a production deployment.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DEPLOY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
 
 jobs:
-  verify-and-deploy:
+  test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -36,20 +40,49 @@ jobs:
           go vet ./...
       - name: Test
         run: go test -race ./...
+
+  # Runs in parallel with the tests; deploy waits for both.
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Build image
         run: docker build --tag "review-api:$GITHUB_SHA" .
       - name: Package release
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: env.DEPLOY == 'true'
         run: |
-          mkdir -p "$RUNNER_TEMP/release/deploy"
-          docker save "review-api:$GITHUB_SHA" | gzip > "$RUNNER_TEMP/release/image.tar.gz"
-          cp compose.yaml "$RUNNER_TEMP/release/"
-          cp deploy/redis-entrypoint.sh "$RUNNER_TEMP/release/deploy/"
-          cp deploy/pull.sh "$RUNNER_TEMP/release/"
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/release/.release-version"
-          tar -czf "$RUNNER_TEMP/release.tar.gz" -C "$RUNNER_TEMP/release" .
+          out="$RUNNER_TEMP/out"
+          release="$RUNNER_TEMP/release"
+          mkdir -p "$out" "$release/deploy"
+          docker save "review-api:$GITHUB_SHA" | gzip > "$release/image.tar.gz"
+          cp compose.yaml deploy/pull.sh "$release/"
+          cp deploy/redis-entrypoint.sh "$release/deploy/"
+          printf '%s\n' "$GITHUB_SHA" > "$release/.release-version"
+          tar -czf "$out/release.tar.gz" -C "$release" .
+          cp deploy/pull.sh "$out/"
+      - if: env.DEPLOY == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/out/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+
+  deploy:
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
       - name: Deploy to server
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
@@ -62,13 +95,18 @@ jobs:
           trap 'rm -rf "$ssh_dir"' EXIT
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_dir/key"
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          # One multiplexed connection serves both commands.
           options=(-i "$ssh_dir/key" -o "UserKnownHostsFile=$ssh_dir/known_hosts"
             -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes
-            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4
+            -o ControlMaster=auto -o "ControlPath=$ssh_dir/mux" -o ControlPersist=60)
           target=wapp@194.146.223.221
           upload_id="$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
           incoming="/home/wapp/.local/share/review-api/incoming/$GITHUB_SHA.$upload_id"
-          ssh "${options[@]}" "$target" "umask 077 && mkdir -p '$incoming'"
-          scp "${options[@]}" "$RUNNER_TEMP/release.tar.gz" \
-            "$target:$incoming/release.tar.gz"
-          ssh "${options[@]}" "$target" "sh -s -- --activate $GITHUB_SHA $upload_id" < deploy/pull.sh
+          release="$RUNNER_TEMP/release"
+          ssh "${options[@]}" "$target" \
+            "umask 077 && mkdir -p '$incoming' && cat > '$incoming/release.tar.gz'" \
+            < "$release/release.tar.gz"
+          ssh "${options[@]}" "$target" "sh -s -- --activate $GITHUB_SHA $upload_id" \
+            < "$release/pull.sh"
+          ssh "${options[@]}" -O exit "$target" 2>/dev/null || true

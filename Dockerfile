@@ -5,10 +5,8 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY migrations ./migrations
-RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/api ./cmd/api && \
-    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/worker ./cmd/worker && \
-    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/bot ./cmd/bot && \
-    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/migrator ./cmd/migrator
+# One invocation compiles shared packages once and links every command in parallel.
+RUN mkdir /out && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/ ./cmd/...
 
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates tzdata && \

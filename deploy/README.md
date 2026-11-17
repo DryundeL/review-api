@@ -91,10 +91,14 @@ API загрузки. При прямой раздаче фронтендом ф
 
 ## Автодеплой
 
-Push в `main` запускает `.github/workflows/deploy.yml`: форматирование,
-`go vet`, race-тесты, сборку Docker-образа на GitHub, доставку по SSH и вызов
-`pull.sh` с SHA нового релиза. Pull request запускает только проверки и сборку.
-Есть ручной запуск workflow для `main`.
+Push в `main` запускает `.github/workflows/deploy.yml`. Параллельно идут
+`test` (форматирование, `go vet`, race-тесты) и `build` (Docker-образ и архив
+релиза). После обоих job `deploy` одним SSH-соединением загружает архив и
+вызывает `pull.sh` с SHA нового релиза. Pull request запускает только проверки
+и сборку, устаревшие запуски PR отменяются. Есть ручной запуск для `main`.
+
+Healthcheck API и PostgreSQL во время старта опрашиваются каждые 2 секунды
+(`start_interval`), затем раз в минуту, поэтому деплой не ждёт полный интервал.
 
 GitHub Actions Secrets: `DEPLOY_SSH_KEY` — отдельный ключ `wapp`,
 `DEPLOY_KNOWN_HOSTS` — проверенные SSH host keys сервера.

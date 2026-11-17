@@ -8,11 +8,14 @@ var (
 	ErrAlreadyReported = errors.New("already reported")
 	ErrInvalid         = errors.New("invalid")
 	ErrForbidden       = errors.New("forbidden")
+	// ErrRevisionConflict: the expected revision is no longer current.
+	ErrRevisionConflict = errors.New("revision conflict")
 )
 
-// FieldError names the rejected field. The field is a fixed token, never raw input.
+// FieldError names the rejected field and an optional stable reason. Both are fixed tokens, never raw input.
 type FieldError struct {
-	Field string
+	Field  string
+	Reason string
 }
 
 func (e FieldError) Error() string {

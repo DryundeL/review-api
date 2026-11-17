@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -24,14 +23,13 @@ func NewPublishedHandler(grant *command.GrantPointsHandler, advance *command.Adv
 }
 
 func (h *PublishedHandler) Handle(ctx context.Context, _ string, payload []byte) error {
-	if h == nil || h.grant == nil || h.points.ReviewPerBlock < 1 {
+	if h == nil || h.grant == nil || h.points.ReviewPublish < 1 {
 		return nil
 	}
 	var body struct {
-		ID         string `json:"id"`
-		AuthorID   string `json:"authorId"`
-		BlockCount string `json:"blockCount"`
-		MediaType  string `json:"mediaType"`
+		ID        string `json:"id"`
+		AuthorID  string `json:"authorId"`
+		MediaType string `json:"mediaType"`
 	}
 	if err := json.Unmarshal(payload, &body); err != nil {
 		return fmt.Errorf("published payload: %w", err)
@@ -44,12 +42,8 @@ func (h *PublishedHandler) Handle(ctx context.Context, _ string, payload []byte)
 	if err != nil {
 		return nil
 	}
-	blocks, err := strconv.Atoi(body.BlockCount)
-	if err != nil || blocks < 1 {
-		return nil
-	}
-	amount := h.points.ReviewPerBlock * blocks
-	if err := h.grant.Handle(ctx, authorID, amount, "review_publish", "review_publish:"+reviewID.String()); err != nil {
+	// Fixed amount per review: blocks are gone, so "blocks_written" no longer advances.
+	if err := h.grant.Handle(ctx, authorID, h.points.ReviewPublish, "review_publish", "review_publish:"+reviewID.String()); err != nil {
 		return err
 	}
 	if h.advance == nil {
@@ -57,9 +51,6 @@ func (h *PublishedHandler) Handle(ctx context.Context, _ string, payload []byte)
 	}
 	rid := reviewID.String()
 	if _, _, err := h.advance.Handle(ctx, authorID, "reviews_published", 1, "ach:pub:"+rid+":reviews"); err != nil {
-		return err
-	}
-	if _, _, err := h.advance.Handle(ctx, authorID, "blocks_written", blocks, "ach:pub:"+rid+":blocks"); err != nil {
 		return err
 	}
 	mediaType := strings.ToLower(strings.TrimSpace(body.MediaType))

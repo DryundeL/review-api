@@ -30,6 +30,12 @@ func (r *topReader) ListByMedia(context.Context, uuid.UUID, uuid.UUID, int) ([]p
 func (r *topReader) ListByAuthor(context.Context, uuid.UUID, uuid.UUID, bool, int) ([]ports.Review, error) {
 	panic("unexpected ListByAuthor")
 }
+func (r *topReader) Editor(context.Context, uuid.UUID, uuid.UUID) (ports.EditorReview, error) {
+	return ports.EditorReview{}, nil
+}
+func (r *topReader) EditorByMedia(context.Context, uuid.UUID, uuid.UUID) (ports.EditorReview, error) {
+	return ports.EditorReview{}, nil
+}
 func (r *topReader) TopByMedia(_ context.Context, mediaID, viewerID uuid.UUID) ([]ports.Review, error) {
 	r.called = true
 	r.mediaID = mediaID
@@ -84,7 +90,9 @@ func TestReviewPublicReadAndProtectedWrites(t *testing.T) {
 		status       int
 	}{
 		{"GET", "/reviews/" + id.String(), 200}, {"POST", "/reviews", 401}, {"GET", "/profile/reviews", 401},
-		{"PATCH", "/reviews/" + id.String(), 401}, {"DELETE", "/reviews/" + id.String(), 401},
+		{"GET", "/reviews/draft?mediaObjectId=" + id.String(), 401},
+		{"PUT", "/reviews/" + id.String() + "/draft", 401}, {"POST", "/reviews/" + id.String() + "/publish", 401},
+		{"PATCH", "/reviews/" + id.String(), 405}, {"DELETE", "/reviews/" + id.String(), 401},
 		{"PUT", "/reviews/" + id.String() + "/vote", 401}, {"POST", "/reviews/" + id.String() + "/reports", 401},
 	} {
 		rec := httptest.NewRecorder()

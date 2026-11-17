@@ -2,6 +2,7 @@ package reviewshttp
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 
 	"review-api/internal/http/httperr"
 )
@@ -25,11 +26,14 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc, profil
 
 	g.GET("/media-objects/:id/top-reviews", h.TopReviews, opt)
 	g.GET("/reviews", h.ListReviews, opt)
+	limit := middleware.BodyLimit(maxWriteBodyBytes)
+	g.GET("/reviews/draft", h.GetOwnReview, auth)
 	g.GET("/reviews/:id", h.GetReview, opt)
-	g.POST("/reviews", h.CreateReview, auth)
+	g.POST("/reviews", h.CreateReview, auth, limit)
+	g.PUT("/reviews/:id/draft", h.SaveReviewDraft, auth, limit)
+	g.POST("/reviews/:id/publish", h.PublishReview, auth, limit)
 	g.GET("/reviews/:id/comments", h.ListComments, opt)
 	g.POST("/reviews/:id/comments", h.CreateComment, auth)
-	g.PATCH("/reviews/:id", h.UpdateReview, auth)
 	g.DELETE("/reviews/:id", h.DeleteReview, auth)
 	g.PUT("/reviews/:id/vote", h.VoteReview, auth)
 	g.PUT("/reviews/:id/view", h.ViewReview, auth)

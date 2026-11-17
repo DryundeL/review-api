@@ -12,12 +12,8 @@ import (
 	"review-api/internal/modules/feed/internal/application/ports"
 )
 
-const spoilersExistSQL = `
-	(SELECT EXISTS (
-		SELECT 1 FROM review_blocks b
-		WHERE b.review_id = r.id AND b.body ~ '\|\|.*\|\|'
-	)) AS has_spoilers
-`
+// spoilersExistSQL reads only the published body, never the working version.
+const spoilersExistSQL = `(r.body ~ '\|\|.*\|\|') AS has_spoilers`
 
 // Repository reads the published feed via keyset pagination.
 // ponytail: direct read of reviews/follows; materialize when write volume or following fan-out hurts

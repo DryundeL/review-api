@@ -18,7 +18,7 @@ func NewGetReviewHandler(repo ports.ReviewReader) *GetReviewHandler {
 	return &GetReviewHandler{repo: repo}
 }
 
-// Handle returns a review. Drafts are visible only to the author (viewerID).
+// Handle returns the published version only, even to the author; anything else is 404.
 func (h *GetReviewHandler) Handle(ctx context.Context, id, viewerID uuid.UUID) (ports.Review, error) {
 	if h == nil || h.repo == nil {
 		return ports.Review{}, contract.ErrInvalid
@@ -27,7 +27,7 @@ func (h *GetReviewHandler) Handle(ctx context.Context, id, viewerID uuid.UUID) (
 	if err != nil {
 		return ports.Review{}, err
 	}
-	if item.Status == domain.StatusDraft && item.AuthorID != viewerID {
+	if item.Status != domain.StatusPublished {
 		return ports.Review{}, contract.ErrNotFound
 	}
 	return item, nil
@@ -64,4 +64,23 @@ func (h *ListReviewsHandler) TopByMedia(ctx context.Context, mediaObjectID, view
 		return nil, contract.ErrNotFound
 	}
 	return h.repo.TopByMedia(ctx, mediaObjectID, viewerID)
+}
+
+type EditorReviewHandler struct {
+	repo ports.ReviewReader
+}
+
+func NewEditorReviewHandler(repo ports.ReviewReader) *EditorReviewHandler {
+	return &EditorReviewHandler{repo: repo}
+}
+
+// ByMedia finds the author's own review of a media object; 404 when there is none yet.
+func (h *EditorReviewHandler) ByMedia(ctx context.Context, authorID, mediaObjectID uuid.UUID) (ports.EditorReview, error) {
+	if h == nil || h.repo == nil {
+		return ports.EditorReview{}, contract.ErrInvalid
+	}
+	if mediaObjectID == uuid.Nil {
+		return ports.EditorReview{}, contract.FieldError{Field: "mediaObjectId"}
+	}
+	return h.repo.EditorByMedia(ctx, authorID, mediaObjectID)
 }

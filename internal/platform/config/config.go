@@ -52,32 +52,32 @@ func (c RedisConfig) Addr() string {
 }
 
 type AppConfig struct {
-	Env                  string
-	Port                 string
-	URL                  string
-	Version              string
-	TelegramBotToken     string
-	TelegramBotUsername  string
-	JWTSecret            string
-	MiniAppURL           string
-	MiniAppName          string
-	AuthMaxAge           time.Duration
-	RateLimitPerMin      int
-	CORSOrigins          []string
-	OTLPEndpoint         string
-	WorkerPoll           time.Duration
-	WorkerBatch          int
-	AdminToken           string
-	ReportHideThreshold  int
-	PointsReviewPerBlock int
-	PointsLikeGiven      int
-	PointsLikeReceived   int
-	PointsFollower       int
-	SMTPHost             string
-	SMTPPort             int
-	SMTPUser             string
-	SMTPPassword         string
-	SMTPFrom             string
+	Env                 string
+	Port                string
+	URL                 string
+	Version             string
+	TelegramBotToken    string
+	TelegramBotUsername string
+	JWTSecret           string
+	MiniAppURL          string
+	MiniAppName         string
+	AuthMaxAge          time.Duration
+	RateLimitPerMin     int
+	CORSOrigins         []string
+	OTLPEndpoint        string
+	WorkerPoll          time.Duration
+	WorkerBatch         int
+	AdminToken          string
+	ReportHideThreshold int
+	PointsReviewPublish int
+	PointsLikeGiven     int
+	PointsLikeReceived  int
+	PointsFollower      int
+	SMTPHost            string
+	SMTPPort            int
+	SMTPUser            string
+	SMTPPassword        string
+	SMTPFrom            string
 }
 
 func Load() (*Config, error) {
@@ -109,7 +109,7 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	pointsReviewPerBlock, err := atoiDefault("POINTS_REVIEW_PER_BLOCK", 10)
+	pointsReviewPublish, err := atoiDefault("POINTS_REVIEW_PUBLISH", 10)
 	if err != nil {
 		return nil, err
 	}
@@ -146,32 +146,32 @@ func Load() (*Config, error) {
 			DB:       redisDB,
 		},
 		App: AppConfig{
-			Env:                  getEnv("APP_ENV", "development"),
-			Port:                 getEnv("APP_PORT", "8080"),
-			URL:                  getEnv("APP_URL", "http://localhost:8080"),
-			Version:              getEnv("APP_VERSION", "dev"),
-			TelegramBotToken:     os.Getenv("TELEGRAM_BOT_TOKEN"),
-			TelegramBotUsername:  os.Getenv("TELEGRAM_BOT_USERNAME"),
-			JWTSecret:            os.Getenv("JWT_SECRET"),
-			MiniAppURL:           os.Getenv("MINI_APP_URL"),
-			MiniAppName:          getEnv("MINI_APP_NAME", "Review Hub"),
-			AuthMaxAge:           authMaxAge,
-			RateLimitPerMin:      rateLimit,
-			CORSOrigins:          parseCommaSeparatedList(os.Getenv("APP_CORS_ORIGINS")),
-			OTLPEndpoint:         os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
-			WorkerPoll:           workerPoll,
-			WorkerBatch:          workerBatch,
-			AdminToken:           os.Getenv("ADMIN_TOKEN"),
-			ReportHideThreshold:  reportHideThreshold,
-			PointsReviewPerBlock: pointsReviewPerBlock,
-			PointsLikeGiven:      pointsLikeGiven,
-			PointsLikeReceived:   pointsLikeReceived,
-			PointsFollower:       pointsFollower,
-			SMTPHost:             os.Getenv("SMTP_HOST"),
-			SMTPPort:             smtpPort,
-			SMTPUser:             os.Getenv("SMTP_USER"),
-			SMTPPassword:         os.Getenv("SMTP_PASSWORD"),
-			SMTPFrom:             os.Getenv("SMTP_FROM"),
+			Env:                 getEnv("APP_ENV", "development"),
+			Port:                getEnv("APP_PORT", "8080"),
+			URL:                 getEnv("APP_URL", "http://localhost:8080"),
+			Version:             getEnv("APP_VERSION", "dev"),
+			TelegramBotToken:    os.Getenv("TELEGRAM_BOT_TOKEN"),
+			TelegramBotUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
+			JWTSecret:           os.Getenv("JWT_SECRET"),
+			MiniAppURL:          os.Getenv("MINI_APP_URL"),
+			MiniAppName:         getEnv("MINI_APP_NAME", "Review Hub"),
+			AuthMaxAge:          authMaxAge,
+			RateLimitPerMin:     rateLimit,
+			CORSOrigins:         parseCommaSeparatedList(os.Getenv("APP_CORS_ORIGINS")),
+			OTLPEndpoint:        os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+			WorkerPoll:          workerPoll,
+			WorkerBatch:         workerBatch,
+			AdminToken:          os.Getenv("ADMIN_TOKEN"),
+			ReportHideThreshold: reportHideThreshold,
+			PointsReviewPublish: pointsReviewPublish,
+			PointsLikeGiven:     pointsLikeGiven,
+			PointsLikeReceived:  pointsLikeReceived,
+			PointsFollower:      pointsFollower,
+			SMTPHost:            os.Getenv("SMTP_HOST"),
+			SMTPPort:            smtpPort,
+			SMTPUser:            os.Getenv("SMTP_USER"),
+			SMTPPassword:        os.Getenv("SMTP_PASSWORD"),
+			SMTPFrom:            os.Getenv("SMTP_FROM"),
 		},
 	}
 

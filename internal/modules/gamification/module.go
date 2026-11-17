@@ -32,10 +32,10 @@ type ReviewLookup interface {
 }
 
 type PointsConfig struct {
-	ReviewPerBlock int
-	LikeGiven      int
-	LikeReceived   int
-	Follower       int
+	ReviewPublish int
+	LikeGiven     int
+	LikeReceived  int
+	Follower      int
 }
 
 type Dependencies struct {
@@ -83,10 +83,10 @@ func New(deps Dependencies) *Module {
 	grant.SetAdvance(advance)
 	purchase.SetAdvance(advance)
 	points := consumer.PointsConfig{
-		ReviewPerBlock: deps.Points.ReviewPerBlock,
-		LikeGiven:      deps.Points.LikeGiven,
-		LikeReceived:   deps.Points.LikeReceived,
-		Follower:       deps.Points.Follower,
+		ReviewPublish: deps.Points.ReviewPublish,
+		LikeGiven:     deps.Points.LikeGiven,
+		LikeReceived:  deps.Points.LikeReceived,
+		Follower:      deps.Points.Follower,
 	}
 	return &Module{
 		list:              query.NewListShopItemsHandler(listReader),

@@ -2,16 +2,12 @@ package reviewshttp
 
 import (
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"golang.org/x/net/html"
 
 	"review-api/internal/http/httperr"
 	authcontract "review-api/internal/modules/auth/contract"
@@ -21,19 +17,38 @@ import (
 	"review-api/internal/modules/reviews/internal/domain"
 )
 
-const maxBlockBodyLen = 500
+// maxWriteBodyBytes caps editor requests: 20 000 text characters say nothing about markup size.
+const maxWriteBodyBytes = "256K"
 
-type reviewBody struct {
-	MediaObjectID string            `json:"mediaObjectId"`
-	Title         string            `json:"title"`
-	Rating        int16             `json:"rating"`
-	Status        string            `json:"status"`
-	Blocks        []reviewBlockBody `json:"blocks"`
+// Only editable fields are bound; author, status and counters never come from the client.
+type createReviewBody struct {
+	MediaObjectID string `json:"mediaObjectId"`
+	Title         string `json:"title"`
+	Rating        *int16 `json:"rating"`
+	Body          string `json:"body"`
 }
 
-type reviewBlockBody struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
+type saveDraftBody struct {
+	Title    string `json:"title"`
+	Rating   *int16 `json:"rating"`
+	Body     string `json:"body"`
+	Revision int64  `json:"revision"`
+}
+
+type publishBody struct {
+	Revision int64 `json:"revision"`
+}
+
+type editorJSON struct {
+	ID                    string           `json:"id"`
+	MediaObject           *mediaObjectJSON `json:"mediaObject,omitempty"`
+	Status                string           `json:"status"`
+	Title                 string           `json:"title"`
+	Rating                *int16           `json:"rating"`
+	Body                  string           `json:"body"`
+	Revision              int64            `json:"revision"`
+	HasUnpublishedChanges bool             `json:"hasUnpublishedChanges"`
+	PublishedAt           *string          `json:"publishedAt,omitempty"`
 }
 
 type voteBody struct {
@@ -61,19 +76,21 @@ type reasonsListResponse struct {
 }
 
 type reviewJSON struct {
-	ID            string           `json:"id"`
-	AuthorID      string           `json:"authorId"`
-	Author        *authorJSON      `json:"author,omitempty"`
-	MediaObject   *mediaObjectJSON `json:"mediaObject,omitempty"`
-	Title         string           `json:"title"`
-	Rating        int16            `json:"rating"`
-	Status        string           `json:"status,omitempty"`
-	Blocks        []blockJSON      `json:"blocks,omitempty"`
-	HasSpoilers   bool             `json:"hasSpoilers"`
-	LikesCount    int64            `json:"likesCount"`
-	DislikesCount int64            `json:"dislikesCount"`
-	ViewsCount    int64            `json:"viewsCount"`
-	ViewerIsLike  *bool            `json:"viewerIsLike,omitempty"`
+	ID          string           `json:"id"`
+	AuthorID    string           `json:"authorId"`
+	Author      *authorJSON      `json:"author,omitempty"`
+	MediaObject *mediaObjectJSON `json:"mediaObject,omitempty"`
+	Title       string           `json:"title"`
+	Rating      *int16           `json:"rating"`
+	Status      string           `json:"status,omitempty"`
+	Body        string           `json:"body,omitempty"`
+	HasSpoilers bool             `json:"hasSpoilers"`
+	// Only in the author's own list.
+	HasUnpublishedChanges bool  `json:"hasUnpublishedChanges,omitempty"`
+	LikesCount            int64 `json:"likesCount"`
+	DislikesCount         int64 `json:"dislikesCount"`
+	ViewsCount            int64 `json:"viewsCount"`
+	ViewerIsLike          *bool `json:"viewerIsLike,omitempty"`
 }
 
 type authorJSON struct {
@@ -92,39 +109,55 @@ type mediaObjectJSON struct {
 	PosterURL string `json:"posterUrl,omitempty"`
 }
 
-type blockJSON struct {
-	ID       string `json:"id"`
-	Position int16  `json:"position"`
-	Title    string `json:"title"`
-	Body     string `json:"body"`
-}
-
 type reviewsListResponse struct {
 	Items []reviewJSON `json:"items"`
 }
 
-func (h *Handler) CreateReview(c echo.Context) error {
+func (h *Handler) GetOwnReview(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
 	userID, err := h.resolveUser(c)
 	if err != nil {
 		return err
 	}
-	var body reviewBody
-	if err := c.Bind(&body); err != nil {
-		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+	mediaID, err := uuid.Parse(c.QueryParam("mediaObjectId"))
+	if err != nil {
+		return mapReviewError(contract.FieldError{Field: "mediaObjectId"})
 	}
-	draft, err := parseReviewDraft(body, true)
+	item, err := h.editorReview.ByMedia(c.Request().Context(), userID, mediaID)
 	if err != nil {
 		return mapReviewError(err)
 	}
-	item, err := h.createReview.Handle(c.Request().Context(), userID, draft)
-	if err != nil {
-		return mapReviewError(err)
-	}
-	c.Response().Header().Set("Cache-Control", "no-store")
-	return c.JSON(http.StatusCreated, reviewResponse(item))
+	return c.JSON(http.StatusOK, editorResponse(item))
 }
 
-func (h *Handler) UpdateReview(c echo.Context) error {
+func (h *Handler) CreateReview(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
+	userID, err := h.resolveUser(c)
+	if err != nil {
+		return err
+	}
+	var body createReviewBody
+	if err := c.Bind(&body); err != nil {
+		return bindError(err)
+	}
+	mediaID, err := uuid.Parse(body.MediaObjectID)
+	if err != nil {
+		return mapReviewError(contract.FieldError{Field: "mediaObjectId"})
+	}
+	draft := domain.Draft{Title: body.Title, Rating: body.Rating, Body: body.Body}
+	item, created, err := h.createReview.Handle(c.Request().Context(), userID, mediaID, draft)
+	if err != nil {
+		return mapReviewError(err)
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	return c.JSON(status, editorResponse(item))
+}
+
+func (h *Handler) SaveReviewDraft(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
 	userID, err := h.resolveUser(c)
 	if err != nil {
 		return err
@@ -133,20 +166,46 @@ func (h *Handler) UpdateReview(c echo.Context) error {
 	if err != nil {
 		return httperr.New(http.StatusNotFound, "NOT_FOUND", "review not found")
 	}
-	var body reviewBody
+	var body saveDraftBody
 	if err := c.Bind(&body); err != nil {
-		return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+		return bindError(err)
 	}
-	draft, err := parseReviewDraft(body, false)
+	draft := domain.Draft{Title: body.Title, Rating: body.Rating, Body: body.Body}
+	item, err := h.saveDraft.Handle(c.Request().Context(), id, userID, body.Revision, draft)
 	if err != nil {
 		return mapReviewError(err)
 	}
-	item, err := h.updateReview.Handle(c.Request().Context(), id, userID, draft)
-	if err != nil {
-		return mapReviewError(err)
-	}
+	return c.JSON(http.StatusOK, editorResponse(item))
+}
+
+func (h *Handler) PublishReview(c echo.Context) error {
 	c.Response().Header().Set("Cache-Control", "no-store")
-	return c.JSON(http.StatusOK, reviewResponse(item))
+	userID, err := h.resolveUser(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return httperr.New(http.StatusNotFound, "NOT_FOUND", "review not found")
+	}
+	var body publishBody
+	if err := c.Bind(&body); err != nil {
+		return bindError(err)
+	}
+	item, err := h.publishReview.Handle(c.Request().Context(), id, userID, body.Revision)
+	if err != nil {
+		return mapReviewError(err)
+	}
+	return c.JSON(http.StatusOK, editorResponse(item))
+}
+
+// bindError keeps the 413 from the body limit instead of masking it as 400.
+func bindError(err error) error {
+	var he *echo.HTTPError
+	if errors.As(err, &he) && he.Code == http.StatusRequestEntityTooLarge {
+		return err
+	}
+	return httperr.New(http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
 }
 
 func (h *Handler) GetReview(c echo.Context) error {
@@ -328,47 +387,6 @@ func (h *Handler) optionalUser(c echo.Context) (uuid.UUID, error) {
 	return userID, nil
 }
 
-func parseReviewDraft(body reviewBody, requireMedia bool) (domain.Draft, error) {
-	var mediaID uuid.UUID
-	if requireMedia || body.MediaObjectID != "" {
-		parsed, err := uuid.Parse(body.MediaObjectID)
-		if err != nil {
-			return domain.Draft{}, contract.FieldError{Field: "mediaObjectId"}
-		}
-		mediaID = parsed
-	}
-	blocks := make([]domain.BlockDraft, 0, len(body.Blocks))
-	for _, b := range body.Blocks {
-		if !blockBodyWithinTextLimit(b.Body) {
-			return domain.Draft{}, contract.FieldError{Field: "blocks"}
-		}
-		blocks = append(blocks, domain.BlockDraft{Title: b.Title, Body: b.Body})
-	}
-	return domain.Draft{
-		MediaObjectID: mediaID,
-		Title:         body.Title,
-		Rating:        body.Rating,
-		Status:        body.Status,
-		Blocks:        blocks,
-	}, nil
-}
-
-func blockBodyWithinTextLimit(body string) bool {
-	tokens := html.NewTokenizer(strings.NewReader(body))
-	length := 0
-	for {
-		switch tokens.Next() {
-		case html.ErrorToken:
-			return tokens.Err() == io.EOF
-		case html.TextToken:
-			length += utf8.RuneCount(tokens.Text())
-			if length > maxBlockBodyLen {
-				return false
-			}
-		}
-	}
-}
-
 func parseLimit(c echo.Context) int {
 	raw := c.QueryParam("limit")
 	if raw == "" {
@@ -403,16 +421,12 @@ func reviewListItem(item ports.Review) reviewJSON {
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,
 		ViewerIsLike:  item.ViewerIsLike,
+
+		HasUnpublishedChanges: item.HasUnpublishedChanges,
 	}
 }
 
 func reviewResponse(item ports.Review) reviewJSON {
-	blocks := make([]blockJSON, 0, len(item.Blocks))
-	for _, b := range item.Blocks {
-		blocks = append(blocks, blockJSON{
-			ID: b.ID.String(), Position: b.Position, Title: b.Title, Body: b.Body,
-		})
-	}
 	return reviewJSON{
 		ID:            item.ID.String(),
 		AuthorID:      item.AuthorID.String(),
@@ -421,13 +435,31 @@ func reviewResponse(item ports.Review) reviewJSON {
 		Title:         item.Title,
 		Rating:        item.Rating,
 		Status:        item.Status,
-		Blocks:        blocks,
+		Body:          item.Body,
 		HasSpoilers:   item.HasSpoilers,
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,
 		ViewerIsLike:  item.ViewerIsLike,
 	}
+}
+
+func editorResponse(item ports.EditorReview) editorJSON {
+	out := editorJSON{
+		ID:                    item.ID.String(),
+		MediaObject:           mediaObjectResponse(item.MediaObject),
+		Status:                item.Status,
+		Title:                 item.Title,
+		Rating:                item.Rating,
+		Body:                  item.Body,
+		Revision:              item.Revision,
+		HasUnpublishedChanges: item.HasUnpublishedChanges,
+	}
+	if item.PublishedAt != nil {
+		at := item.PublishedAt.UTC().Format(time.RFC3339Nano)
+		out.PublishedAt = &at
+	}
+	return out
 }
 
 func authorResponse(a ports.AuthorRef) *authorJSON {
@@ -460,14 +492,20 @@ func mapReviewError(err error) error {
 	var field contract.FieldError
 	switch {
 	case errors.As(err, &field):
+		details := map[string]string{"field": field.Field}
+		if field.Reason != "" {
+			details["reason"] = field.Reason
+		}
 		return &httperr.Error{
 			Status:  http.StatusUnprocessableEntity,
 			Code:    "VALIDATION_ERROR",
 			Message: "invalid review",
-			Details: map[string]string{"field": field.Field},
+			Details: details,
 		}
 	case errors.Is(err, contract.ErrNotFound):
 		return httperr.New(http.StatusNotFound, "NOT_FOUND", "review not found")
+	case errors.Is(err, contract.ErrRevisionConflict):
+		return httperr.New(http.StatusConflict, "REVISION_CONFLICT", "review was changed elsewhere")
 	case errors.Is(err, contract.ErrAlreadyReported):
 		return httperr.New(http.StatusConflict, "ALREADY_REPORTED", "review already reported")
 	case errors.Is(err, contract.ErrConflict):

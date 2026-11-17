@@ -28,14 +28,6 @@ type Writer interface {
 	NextSort(ctx context.Context) (int, error)
 }
 
-// Block is a read DTO for one review section.
-type Block struct {
-	ID       uuid.UUID
-	Position int16
-	Title    string
-	Body     string
-}
-
 // MediaObjectRef is a compact catalog title embedded in review responses.
 type MediaObjectRef struct {
 	ID        uuid.UUID
@@ -55,22 +47,36 @@ type AuthorRef struct {
 }
 
 // Review is a read DTO for one review with counters.
-// Lists omit Blocks and set HasSpoilers; Get fills Blocks.
+// Lists omit Body and set HasSpoilers; Get fills Body. Rating is nil only in the author's own drafts.
 // ViewerIsLike: true=like, false=dislike, nil=no vote / anonymous viewer.
 type Review struct {
-	ID            uuid.UUID
-	AuthorID      uuid.UUID
-	Author        AuthorRef
-	MediaObject   MediaObjectRef
-	Title         string
-	Rating        int16
-	Status        string
-	Blocks        []Block
-	HasSpoilers   bool
-	LikesCount    int64
-	DislikesCount int64
-	ViewsCount    int64
-	ViewerIsLike  *bool
+	ID                    uuid.UUID
+	AuthorID              uuid.UUID
+	Author                AuthorRef
+	MediaObject           MediaObjectRef
+	Title                 string
+	Rating                *int16
+	Status                string
+	Body                  string
+	HasSpoilers           bool
+	HasUnpublishedChanges bool
+	LikesCount            int64
+	DislikesCount         int64
+	ViewsCount            int64
+	ViewerIsLike          *bool
+}
+
+// EditorReview is the author's working version. Never cached or shown to others.
+type EditorReview struct {
+	ID                    uuid.UUID
+	MediaObject           MediaObjectRef
+	Status                string
+	Title                 string
+	Rating                *int16
+	Body                  string
+	Revision              int64
+	HasUnpublishedChanges bool
+	PublishedAt           *time.Time
 }
 
 // Reason is one active report_reasons row for the public catalog.
@@ -95,8 +101,10 @@ type ReasonReader interface {
 }
 
 type ReviewWriter interface {
-	Create(ctx context.Context, item domain.Review) error
-	Replace(ctx context.Context, item domain.Review) error
+	// Create reports false when the author already has a review of this media object.
+	Create(ctx context.Context, item domain.Review) (bool, error)
+	SaveDraft(ctx context.Context, item domain.Review) error
+	Publish(ctx context.Context, item domain.Review) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	Get(ctx context.Context, id uuid.UUID) (domain.Review, error)
 	GetForUpdate(ctx context.Context, id uuid.UUID) (domain.Review, error)
@@ -113,6 +121,8 @@ type ReviewReader interface {
 	Get(ctx context.Context, id, viewerID uuid.UUID) (Review, error)
 	ListByMedia(ctx context.Context, mediaObjectID, viewerID uuid.UUID, limit int) ([]Review, error)
 	ListByAuthor(ctx context.Context, authorID, viewerID uuid.UUID, publishedOnly bool, limit int) ([]Review, error)
+	Editor(ctx context.Context, id, authorID uuid.UUID) (EditorReview, error)
+	EditorByMedia(ctx context.Context, authorID, mediaObjectID uuid.UUID) (EditorReview, error)
 }
 
 type Publisher interface {

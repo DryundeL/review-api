@@ -104,10 +104,10 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		Users:   usersMod,
 		Reviews: reviewsMod,
 		Points: gamification.PointsConfig{
-			ReviewPerBlock: cfg.App.PointsReviewPerBlock,
-			LikeGiven:      cfg.App.PointsLikeGiven,
-			LikeReceived:   cfg.App.PointsLikeReceived,
-			Follower:       cfg.App.PointsFollower,
+			ReviewPublish: cfg.App.PointsReviewPublish,
+			LikeGiven:     cfg.App.PointsLikeGiven,
+			LikeReceived:  cfg.App.PointsLikeReceived,
+			Follower:      cfg.App.PointsFollower,
 		},
 	})
 	usersMod.SetCosmetics(gamificationMod)

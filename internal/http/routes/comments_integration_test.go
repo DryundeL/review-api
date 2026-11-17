@@ -133,9 +133,9 @@ func TestCommentsIntegration(t *testing.T) {
 		}
 		return rec
 	}
-	media, review, other, draft := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-	exec(`INSERT INTO media_objects(id,title,type,info) VALUES($1,'Movie','movie','{"releaseStatus":"completed"}')`, media)
-	exec(`INSERT INTO reviews(id,author_id,media_object_id,title,rating,status) VALUES($1,$4,$5,'Review',8,'published'),($2,$6,$5,'Other',7,'published'),($3,$4,$5,'Draft',6,'draft')`, review, other, draft, ids[0], media, ids[2])
+	media, draftMedia, review, other, draft := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	exec(`INSERT INTO media_objects(id,title,type,info) VALUES($1,'Movie','movie','{"releaseStatus":"completed"}'),($2,'Movie 2','movie','{"releaseStatus":"completed"}')`, media, draftMedia)
+	exec(`INSERT INTO reviews(id,author_id,media_object_id,title,rating,status) VALUES($1,$4,$5,'Review',8,'published'),($2,$6,$5,'Other',7,'published'),($3,$4,$7,'Draft',6,'draft')`, review, other, draft, ids[0], media, ids[2], draftMedia)
 	path := "/reviews/" + review.String() + "/comments"
 	type comment struct {
 		ID         uuid.UUID  `json:"id"`

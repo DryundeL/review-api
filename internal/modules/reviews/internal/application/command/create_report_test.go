@@ -47,9 +47,10 @@ type reportFakeRepo struct {
 	unpublished bool
 }
 
-func (r *reportFakeRepo) Create(context.Context, domain.Review) error  { return nil }
-func (r *reportFakeRepo) Replace(context.Context, domain.Review) error { return nil }
-func (r *reportFakeRepo) Delete(context.Context, uuid.UUID) error      { return nil }
+func (r *reportFakeRepo) Create(context.Context, domain.Review) (bool, error) { return true, nil }
+func (r *reportFakeRepo) SaveDraft(context.Context, domain.Review) error      { return nil }
+func (r *reportFakeRepo) Publish(context.Context, domain.Review) error        { return nil }
+func (r *reportFakeRepo) Delete(context.Context, uuid.UUID) error             { return nil }
 func (r *reportFakeRepo) Get(context.Context, uuid.UUID) (domain.Review, error) {
 	return r.review, nil
 }

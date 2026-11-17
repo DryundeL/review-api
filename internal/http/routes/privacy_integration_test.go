@@ -292,18 +292,23 @@ func TestPrivacyAndFollowRequestsIntegration(t *testing.T) {
 		check("GET", path+suffix, "stranger", "", 404)
 	}
 	// Publicly published reviews remain readable even from a private profile.
-	media, review, draft := uuid.New(), uuid.New(), uuid.New()
+	media, draftMedia, review, draft := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	exec := func(sql string, args ...any) {
 		t.Helper()
 		if _, err := pool.Exec(ctx, sql, args...); err != nil {
 			t.Fatal(err)
 		}
 	}
-	exec(`INSERT INTO media_objects(id,title,type,info) VALUES($1,'Movie','movie','{"releaseStatus":"completed"}')`, media)
-	exec(`INSERT INTO reviews(id,author_id,media_object_id,title,rating,status) VALUES($1,$2,$3,'Published',8,'published'),($4,$2,$3,'Draft',8,'draft')`, review, owner, media, draft)
+	exec(`INSERT INTO media_objects(id,title,type,info) VALUES($1,'Movie','movie','{"releaseStatus":"completed"}'),($2,'Movie 2','movie','{"releaseStatus":"completed"}')`, media, draftMedia)
+	exec(`INSERT INTO reviews(id,author_id,media_object_id,title,rating,status) VALUES($1,$2,$3,'Published',8,'published'),($4,$2,$5,'Draft',8,'draft')`, review, owner, media, draft, draftMedia)
 	check("GET", "/reviews/"+review.String(), "", "", 200)
 	check("GET", "/reviews/"+draft.String(), "", "", 404)
-	check("GET", "/reviews/"+draft.String(), "owner", "", 200)
+	check("GET", "/reviews/"+draft.String(), "owner", "", 404)
+	rec = check("GET", "/reviews/draft?mediaObjectId="+draftMedia.String(), "owner", "", 200)
+	if !strings.Contains(rec.Body.String(), draft.String()) || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("own draft=%s", rec.Body.String())
+	}
+	check("GET", "/reviews/draft?mediaObjectId="+draftMedia.String(), "follower", "", 404)
 	rec = check("GET", "/feed", "", "", 200)
 	if !strings.Contains(rec.Body.String(), review.String()) || strings.Contains(rec.Body.String(), draft.String()) {
 		t.Fatal("feed visibility incorrect")

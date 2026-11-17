@@ -36,40 +36,44 @@ type Handler struct {
 	createComment *command.CreateCommentHandler
 	listComments  *query.ListCommentsHandler
 
-	list         *query.ListTypesHandler
-	create       *command.CreateTypeHandler
-	update       *command.UpdateTypeHandler
-	statuses     StatusCatalog
-	createReview *command.CreateReviewHandler
-	updateReview *command.UpdateReviewHandler
-	deleteReview *command.DeleteReviewHandler
-	getReview    *query.GetReviewHandler
-	listReviews  *query.ListReviewsHandler
-	voteReview   *command.VoteReviewHandler
-	viewReview   *command.ViewReviewHandler
-	listReasons  *query.ListReasonsHandler
-	createReport *command.CreateReportHandler
-	users        UserResolver
+	list          *query.ListTypesHandler
+	create        *command.CreateTypeHandler
+	update        *command.UpdateTypeHandler
+	statuses      StatusCatalog
+	createReview  *command.CreateReviewHandler
+	saveDraft     *command.SaveDraftHandler
+	publishReview *command.PublishReviewHandler
+	editorReview  *query.EditorReviewHandler
+	deleteReview  *command.DeleteReviewHandler
+	getReview     *query.GetReviewHandler
+	listReviews   *query.ListReviewsHandler
+	voteReview    *command.VoteReviewHandler
+	viewReview    *command.ViewReviewHandler
+	listReasons   *query.ListReasonsHandler
+	createReport  *command.CreateReportHandler
+	users         UserResolver
 }
 
 type HandlerDeps struct {
 	CreateComment *command.CreateCommentHandler
 	ListComments  *query.ListCommentsHandler
 
-	ListTypes    *query.ListTypesHandler
-	CreateType   *command.CreateTypeHandler
-	UpdateType   *command.UpdateTypeHandler
-	Statuses     StatusCatalog
-	CreateReview *command.CreateReviewHandler
-	UpdateReview *command.UpdateReviewHandler
-	DeleteReview *command.DeleteReviewHandler
-	GetReview    *query.GetReviewHandler
-	ListReviews  *query.ListReviewsHandler
-	VoteReview   *command.VoteReviewHandler
-	ViewReview   *command.ViewReviewHandler
-	ListReasons  *query.ListReasonsHandler
-	CreateReport *command.CreateReportHandler
-	Users        UserResolver
+	ListTypes     *query.ListTypesHandler
+	CreateType    *command.CreateTypeHandler
+	UpdateType    *command.UpdateTypeHandler
+	Statuses      StatusCatalog
+	CreateReview  *command.CreateReviewHandler
+	SaveDraft     *command.SaveDraftHandler
+	PublishReview *command.PublishReviewHandler
+	EditorReview  *query.EditorReviewHandler
+	DeleteReview  *command.DeleteReviewHandler
+	GetReview     *query.GetReviewHandler
+	ListReviews   *query.ListReviewsHandler
+	VoteReview    *command.VoteReviewHandler
+	ViewReview    *command.ViewReviewHandler
+	ListReasons   *query.ListReasonsHandler
+	CreateReport  *command.CreateReportHandler
+	Users         UserResolver
 }
 
 func NewHandler(deps HandlerDeps) *Handler {
@@ -77,20 +81,22 @@ func NewHandler(deps HandlerDeps) *Handler {
 		createComment: deps.CreateComment,
 		listComments:  deps.ListComments,
 
-		list:         deps.ListTypes,
-		create:       deps.CreateType,
-		update:       deps.UpdateType,
-		statuses:     deps.Statuses,
-		createReview: deps.CreateReview,
-		updateReview: deps.UpdateReview,
-		deleteReview: deps.DeleteReview,
-		getReview:    deps.GetReview,
-		listReviews:  deps.ListReviews,
-		voteReview:   deps.VoteReview,
-		viewReview:   deps.ViewReview,
-		listReasons:  deps.ListReasons,
-		createReport: deps.CreateReport,
-		users:        deps.Users,
+		list:          deps.ListTypes,
+		create:        deps.CreateType,
+		update:        deps.UpdateType,
+		statuses:      deps.Statuses,
+		createReview:  deps.CreateReview,
+		saveDraft:     deps.SaveDraft,
+		publishReview: deps.PublishReview,
+		editorReview:  deps.EditorReview,
+		deleteReview:  deps.DeleteReview,
+		getReview:     deps.GetReview,
+		listReviews:   deps.ListReviews,
+		voteReview:    deps.VoteReview,
+		viewReview:    deps.ViewReview,
+		listReasons:   deps.ListReasons,
+		createReport:  deps.CreateReport,
+		users:         deps.Users,
 	}
 }
 

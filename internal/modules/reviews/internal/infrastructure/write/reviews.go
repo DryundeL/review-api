@@ -16,7 +16,7 @@ import (
 	"review-api/internal/platform/transaction"
 )
 
-// ReviewRepository persists reviews, blocks, votes, and views.
+// ReviewRepository persists reviews, votes, and views.
 type ReviewRepository struct {
 	pool *pgxpool.Pool
 }
@@ -25,36 +25,51 @@ func NewReviewRepository(pool *pgxpool.Pool) *ReviewRepository {
 	return &ReviewRepository{pool: pool}
 }
 
-func (r *ReviewRepository) Create(ctx context.Context, item domain.Review) error {
+func (r *ReviewRepository) Create(ctx context.Context, item domain.Review) (bool, error) {
 	const insertReview = `
-		INSERT INTO reviews (id, author_id, media_object_id, title, rating, status)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO reviews (id, author_id, media_object_id, title, status, draft_title, draft_rating, draft_body, revision)
+		VALUES ($1, $2, $3, '', 'draft', $4, $5, $6, $7)
+		ON CONFLICT (author_id, media_object_id) DO NOTHING
 	`
-	if err := r.exec(ctx, insertReview,
-		item.ID, item.AuthorID, item.MediaObjectID, item.Title, item.Rating, item.Status,
-	); err != nil {
-		return mapReviewWriteError(err)
+	tag, err := r.execTag(ctx, insertReview,
+		item.ID, item.AuthorID, item.MediaObjectID, item.Title, item.Rating, item.Body, item.Revision,
+	)
+	if err != nil {
+		return false, mapReviewWriteError(err)
 	}
-	return r.insertBlocks(ctx, item.ID, item.Blocks)
+	return tag.RowsAffected() == 1, nil
 }
 
-func (r *ReviewRepository) Replace(ctx context.Context, item domain.Review) error {
-	const updateReview = `
+// SaveDraft writes only the working version; the public columns stay as they are.
+func (r *ReviewRepository) SaveDraft(ctx context.Context, item domain.Review) error {
+	const query = `
 		UPDATE reviews
-		SET title = $2, rating = $3, status = $4, updated_at = NOW()
+		SET draft_title = $2, draft_rating = $3, draft_body = $4, revision = $5, updated_at = NOW()
 		WHERE id = $1
 	`
-	tag, err := r.execTag(ctx, updateReview, item.ID, item.Title, item.Rating, item.Status)
+	return r.updateOne(ctx, query, item.ID, item.Title, item.Rating, item.Body, item.Revision)
+}
+
+// Publish copies the working version to the public columns.
+func (r *ReviewRepository) Publish(ctx context.Context, item domain.Review) error {
+	const query = `
+		UPDATE reviews
+		SET title = draft_title, rating = draft_rating, body = draft_body,
+			status = 'published', published_revision = revision, published_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND revision = $2
+	`
+	return r.updateOne(ctx, query, item.ID, item.Revision)
+}
+
+func (r *ReviewRepository) updateOne(ctx context.Context, query string, args ...any) error {
+	tag, err := r.execTag(ctx, query, args...)
 	if err != nil {
 		return mapReviewWriteError(err)
 	}
 	if tag.RowsAffected() == 0 {
 		return contract.ErrNotFound
 	}
-	if err := r.exec(ctx, `DELETE FROM review_blocks WHERE review_id = $1`, item.ID); err != nil {
-		return fmt.Errorf("delete review blocks: %w", err)
-	}
-	return r.insertBlocks(ctx, item.ID, item.Blocks)
+	return nil
 }
 
 func (r *ReviewRepository) MediaType(ctx context.Context, mediaObjectID uuid.UUID) (string, error) {
@@ -86,7 +101,8 @@ func (r *ReviewRepository) get(ctx context.Context, id uuid.UUID, forUpdate bool
 		return domain.Review{}, contract.ErrNotFound
 	}
 	query := `
-		SELECT id, author_id, media_object_id, title, rating, status
+		SELECT id, author_id, media_object_id, status, draft_title, draft_rating, draft_body,
+			revision, published_revision
 		FROM reviews
 		WHERE id = $1
 	`
@@ -95,7 +111,8 @@ func (r *ReviewRepository) get(ctx context.Context, id uuid.UUID, forUpdate bool
 	}
 	var item domain.Review
 	err := r.queryRow(ctx, query, id).Scan(
-		&item.ID, &item.AuthorID, &item.MediaObjectID, &item.Title, &item.Rating, &item.Status,
+		&item.ID, &item.AuthorID, &item.MediaObjectID, &item.Status, &item.Title, &item.Rating, &item.Body,
+		&item.Revision, &item.PublishedRevision,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Review{}, contract.ErrNotFound
@@ -103,14 +120,6 @@ func (r *ReviewRepository) get(ctx context.Context, id uuid.UUID, forUpdate bool
 	if err != nil {
 		return domain.Review{}, fmt.Errorf("get review: %w", err)
 	}
-	if forUpdate {
-		return item, nil
-	}
-	blocks, err := r.loadBlocks(ctx, id)
-	if err != nil {
-		return domain.Review{}, err
-	}
-	item.Blocks = blocks
 	return item, nil
 }
 
@@ -245,42 +254,6 @@ func (r *ReviewRepository) InsertView(ctx context.Context, reviewID, userID uuid
 		return false, mapReviewWriteError(err)
 	}
 	return true, nil
-}
-
-func (r *ReviewRepository) insertBlocks(ctx context.Context, reviewID uuid.UUID, blocks []domain.Block) error {
-	const insert = `
-		INSERT INTO review_blocks (id, review_id, position, title, body)
-		VALUES ($1, $2, $3, $4, $5)
-	`
-	for _, block := range blocks {
-		if err := r.exec(ctx, insert, block.ID, reviewID, block.Position, block.Title, block.Body); err != nil {
-			return mapReviewWriteError(err)
-		}
-	}
-	return nil
-}
-
-func (r *ReviewRepository) loadBlocks(ctx context.Context, reviewID uuid.UUID) ([]domain.Block, error) {
-	const query = `
-		SELECT id, position, title, body
-		FROM review_blocks
-		WHERE review_id = $1
-		ORDER BY position
-	`
-	rows, err := r.query(ctx, query, reviewID)
-	if err != nil {
-		return nil, fmt.Errorf("list review blocks: %w", err)
-	}
-	defer rows.Close()
-	out := make([]domain.Block, 0)
-	for rows.Next() {
-		var block domain.Block
-		if err := rows.Scan(&block.ID, &block.Position, &block.Title, &block.Body); err != nil {
-			return nil, fmt.Errorf("scan review block: %w", err)
-		}
-		out = append(out, block)
-	}
-	return out, rows.Err()
 }
 
 func (r *ReviewRepository) exec(ctx context.Context, sql string, args ...any) error {

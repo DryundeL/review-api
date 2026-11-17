@@ -16,15 +16,12 @@ import (
 
 const maxListLimit = 50
 
-// spoilersExistSQL is true when any block body has a ||...|| pair.
-const spoilersExistSQL = `
-	(SELECT EXISTS (
-		SELECT 1 FROM review_blocks b
-		WHERE b.review_id = r.id AND b.body ~ '\|\|.*\|\|'
-	)) AS has_spoilers
-`
+// spoilersExistSQL is true when the public body has a ||...|| pair.
+const spoilersExistSQL = `(r.body ~ '\|\|.*\|\|') AS has_spoilers`
 
 const mediaObjectSelectSQL = `mo.id, mo.title, mo.type, mo.poster_url`
+
+const unpublishedChangesSQL = `(r.published_revision IS NOT NULL AND r.published_revision <> r.revision) AS has_unpublished_changes`
 
 // ReviewRepository reads reviews with counters (no aggregate hydration).
 type ReviewRepository struct {
@@ -48,7 +45,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (por
 				)
 			) AS is_following,
 			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
-			` + mediaObjectSelectSQL + `, r.title, r.rating, r.status,
+			` + mediaObjectSelectSQL + `, r.title, r.rating, r.status, r.body,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count,
@@ -66,12 +63,7 @@ func (r *ReviewRepository) Get(ctx context.Context, id, viewerID uuid.UUID) (por
 	if err != nil {
 		return ports.Review{}, fmt.Errorf("get review: %w", err)
 	}
-	blocks, err := r.loadBlocks(ctx, id)
-	if err != nil {
-		return ports.Review{}, err
-	}
-	item.Blocks = blocks
-	item.HasSpoilers = blocksHaveSpoilers(blocks)
+	item.HasSpoilers = hasSpoilerMarkup(item.Body)
 	return item, nil
 }
 
@@ -108,7 +100,7 @@ func (r *ReviewRepository) listByMedia(ctx context.Context, mediaObjectID, viewe
 		SELECT r.id, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
 			`+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
-			`+spoilersExistSQL+`,
+			`+spoilersExistSQL+`, (FALSE) AS has_unpublished_changes,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count,
@@ -127,15 +119,19 @@ func (r *ReviewRepository) ListByAuthor(ctx context.Context, authorID, viewerID 
 	if authorID == uuid.Nil {
 		return nil, contract.FieldError{Field: "authorId"}
 	}
-	statusFilter := ""
-	if publishedOnly {
-		statusFilter = " AND r.status = 'published'"
+	// Public lists show the published version; the author's own list shows the working one.
+	statusFilter := " AND r.status = 'published'"
+	content := `r.title, r.rating, r.status, ` + spoilersExistSQL + `, (FALSE) AS has_unpublished_changes`
+	if !publishedOnly {
+		statusFilter = ""
+		content = `r.draft_title, r.draft_rating, r.status,
+			(r.draft_body ~ '\|\|.*\|\|') AS has_spoilers,
+			` + unpublishedChangesSQL
 	}
 	return r.list(ctx, `
 		SELECT r.id, r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 			COALESCE(gp.equipped_avatar_frame, ''), COALESCE(gp.equipped_backdrop, ''),
-			`+mediaObjectSelectSQL+`, r.title, r.rating, r.status,
-			`+spoilersExistSQL+`,
+			`+mediaObjectSelectSQL+`, `+content+`,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.is_like) AS likes_count,
 			(SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND NOT v.is_like) AS dislikes_count,
 			(SELECT COUNT(*) FROM review_views v WHERE v.review_id = r.id) AS views_count,
@@ -176,29 +172,6 @@ func (r *ReviewRepository) list(ctx context.Context, query string, filterID, vie
 	return out, nil
 }
 
-func (r *ReviewRepository) loadBlocks(ctx context.Context, reviewID uuid.UUID) ([]ports.Block, error) {
-	const query = `
-		SELECT id, position, title, body
-		FROM review_blocks
-		WHERE review_id = $1
-		ORDER BY position
-	`
-	rows, err := r.pool.Query(ctx, query, reviewID)
-	if err != nil {
-		return nil, fmt.Errorf("list review blocks: %w", err)
-	}
-	defer rows.Close()
-	out := make([]ports.Block, 0)
-	for rows.Next() {
-		var block ports.Block
-		if err := rows.Scan(&block.ID, &block.Position, &block.Title, &block.Body); err != nil {
-			return nil, fmt.Errorf("scan review block: %w", err)
-		}
-		out = append(out, block)
-	}
-	return out, rows.Err()
-}
-
 func scanReview(row pgx.Row) (ports.Review, error) {
 	var item ports.Review
 	var poster *string
@@ -206,7 +179,7 @@ func scanReview(row pgx.Row) (ports.Review, error) {
 		&item.ID, &item.AuthorID, &item.Author.Username, &item.Author.PhotoURL, &item.Author.IsFollowing,
 		&item.Author.AvatarFrame, &item.Author.Backdrop,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
-		&item.Title, &item.Rating, &item.Status,
+		&item.Title, &item.Rating, &item.Status, &item.Body,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
 		&item.ViewerIsLike,
 	)
@@ -228,7 +201,7 @@ func scanListReview(row pgx.Row) (ports.Review, error) {
 		&item.Author.AvatarFrame, &item.Author.Backdrop,
 		&item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
 		&item.Title, &item.Rating, &item.Status,
-		&item.HasSpoilers,
+		&item.HasSpoilers, &item.HasUnpublishedChanges,
 		&item.LikesCount, &item.DislikesCount, &item.ViewsCount,
 		&item.ViewerIsLike,
 	)
@@ -242,15 +215,6 @@ func scanListReview(row pgx.Row) (ports.Review, error) {
 	return item, nil
 }
 
-func blocksHaveSpoilers(blocks []ports.Block) bool {
-	for _, b := range blocks {
-		if hasSpoilerMarkup(b.Body) {
-			return true
-		}
-	}
-	return false
-}
-
 // hasSpoilerMarkup is true when body contains at least one ||...|| pair.
 func hasSpoilerMarkup(body string) bool {
 	i := strings.Index(body, "||")
@@ -258,4 +222,42 @@ func hasSpoilerMarkup(body string) bool {
 		return false
 	}
 	return strings.Contains(body[i+2:], "||")
+}
+
+// Editor returns the working version; only the author can see it.
+func (r *ReviewRepository) Editor(ctx context.Context, id, authorID uuid.UUID) (ports.EditorReview, error) {
+	return r.editor(ctx, `r.id = $1 AND r.author_id = $2`, id, authorID)
+}
+
+func (r *ReviewRepository) EditorByMedia(ctx context.Context, authorID, mediaObjectID uuid.UUID) (ports.EditorReview, error) {
+	return r.editor(ctx, `r.media_object_id = $1 AND r.author_id = $2`, mediaObjectID, authorID)
+}
+
+func (r *ReviewRepository) editor(ctx context.Context, where string, filterID, authorID uuid.UUID) (ports.EditorReview, error) {
+	if r == nil || r.pool == nil || filterID == uuid.Nil || authorID == uuid.Nil {
+		return ports.EditorReview{}, contract.ErrNotFound
+	}
+	query := `
+		SELECT r.id, ` + mediaObjectSelectSQL + `, r.status, r.draft_title, r.draft_rating, r.draft_body,
+			r.revision, ` + unpublishedChangesSQL + `, r.published_at
+		FROM reviews r
+		INNER JOIN media_objects mo ON mo.id = r.media_object_id
+		WHERE ` + where
+	var item ports.EditorReview
+	var poster *string
+	err := r.pool.QueryRow(ctx, query, filterID, authorID).Scan(
+		&item.ID, &item.MediaObject.ID, &item.MediaObject.Title, &item.MediaObject.Type, &poster,
+		&item.Status, &item.Title, &item.Rating, &item.Body,
+		&item.Revision, &item.HasUnpublishedChanges, &item.PublishedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ports.EditorReview{}, contract.ErrNotFound
+	}
+	if err != nil {
+		return ports.EditorReview{}, fmt.Errorf("get editor review: %w", err)
+	}
+	if poster != nil {
+		item.MediaObject.PosterURL = *poster
+	}
+	return item, nil
 }

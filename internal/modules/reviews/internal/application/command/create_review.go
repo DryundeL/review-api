@@ -3,65 +3,40 @@ package command
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 
 	"review-api/internal/modules/reviews/contract"
 	"review-api/internal/modules/reviews/internal/application/ports"
 	"review-api/internal/modules/reviews/internal/domain"
-	"review-api/internal/platform/transaction"
 )
 
 type CreateReviewHandler struct {
-	repo      ports.ReviewWriter
-	reader    ports.ReviewReader
-	tx        transaction.Manager
-	publisher ports.Publisher
+	repo   ports.ReviewWriter
+	reader ports.ReviewReader
 }
 
-func NewCreateReviewHandler(
-	repo ports.ReviewWriter,
-	reader ports.ReviewReader,
-	tx transaction.Manager,
-	publisher ports.Publisher,
-) *CreateReviewHandler {
-	return &CreateReviewHandler{repo: repo, reader: reader, tx: tx, publisher: publisher}
+func NewCreateReviewHandler(repo ports.ReviewWriter, reader ports.ReviewReader) *CreateReviewHandler {
+	return &CreateReviewHandler{repo: repo, reader: reader}
 }
 
-func (h *CreateReviewHandler) Handle(ctx context.Context, authorID uuid.UUID, draft domain.Draft) (ports.Review, error) {
-	if h == nil || h.repo == nil || h.reader == nil || h.tx == nil || h.publisher == nil {
-		return ports.Review{}, contract.ErrInvalid
+// Handle creates a draft on the first edit. If the author already has a review of this
+// media object (another tab, retry), it returns that review untouched and created=false.
+func (h *CreateReviewHandler) Handle(ctx context.Context, authorID, mediaObjectID uuid.UUID, draft domain.Draft) (ports.EditorReview, bool, error) {
+	if h == nil || h.repo == nil || h.reader == nil {
+		return ports.EditorReview{}, false, contract.ErrInvalid
 	}
-	item, err := domain.NewReview(authorID, draft)
+	item, err := domain.NewReview(authorID, mediaObjectID, draft)
 	if err != nil {
-		return ports.Review{}, err
+		return ports.EditorReview{}, false, err
 	}
-	err = h.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := h.repo.Create(txCtx, item); err != nil {
-			return err
-		}
-		if item.Status == domain.StatusPublished {
-			mediaType, err := h.repo.MediaType(txCtx, item.MediaObjectID)
-			if err != nil {
-				return err
-			}
-			return h.publisher.Publish(txCtx, contract.EventPublished, item.ID.String(), map[string]string{
-				"id":            item.ID.String(),
-				"authorId":      item.AuthorID.String(),
-				"mediaObjectId": item.MediaObjectID.String(),
-				"blockCount":    strconv.Itoa(len(item.Blocks)),
-				"mediaType":     mediaType,
-			})
-		}
-		return nil
-	})
+	created, err := h.repo.Create(ctx, item)
 	if err != nil {
-		return ports.Review{}, fmt.Errorf("create review: %w", err)
+		return ports.EditorReview{}, false, fmt.Errorf("create review: %w", err)
 	}
-	out, err := h.reader.Get(ctx, item.ID, authorID)
+	out, err := h.reader.EditorByMedia(ctx, authorID, mediaObjectID)
 	if err != nil {
-		return ports.Review{}, fmt.Errorf("create review read: %w", err)
+		return ports.EditorReview{}, false, fmt.Errorf("create review read: %w", err)
 	}
-	return out, nil
+	return out, created, nil
 }

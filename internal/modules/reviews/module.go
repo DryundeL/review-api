@@ -35,22 +35,24 @@ type Module struct {
 	listComments  *query.ListCommentsHandler
 	comments      *read.ReviewRepository
 
-	list         *query.ListTypesHandler
-	create       *command.CreateTypeHandler
-	update       *command.UpdateTypeHandler
-	createReview *command.CreateReviewHandler
-	updateReview *command.UpdateReviewHandler
-	deleteReview *command.DeleteReviewHandler
-	getReview    *query.GetReviewHandler
-	listReviews  *query.ListReviewsHandler
-	voteReview   *command.VoteReviewHandler
-	viewReview   *command.ViewReviewHandler
-	listReasons  *query.ListReasonsHandler
-	createReport *command.CreateReportHandler
-	types        *read.Repository
-	users        UserResolver
-	admin        echo.MiddlewareFunc
-	auth         echo.MiddlewareFunc
+	list          *query.ListTypesHandler
+	create        *command.CreateTypeHandler
+	update        *command.UpdateTypeHandler
+	createReview  *command.CreateReviewHandler
+	saveDraft     *command.SaveDraftHandler
+	publishReview *command.PublishReviewHandler
+	editorReview  *query.EditorReviewHandler
+	deleteReview  *command.DeleteReviewHandler
+	getReview     *query.GetReviewHandler
+	listReviews   *query.ListReviewsHandler
+	voteReview    *command.VoteReviewHandler
+	viewReview    *command.ViewReviewHandler
+	listReasons   *query.ListReasonsHandler
+	createReport  *command.CreateReportHandler
+	types         *read.Repository
+	users         UserResolver
+	admin         echo.MiddlewareFunc
+	auth          echo.MiddlewareFunc
 }
 
 func New(deps Dependencies) *Module {
@@ -69,22 +71,24 @@ func New(deps Dependencies) *Module {
 		listComments:  query.NewListCommentsHandler(reviewReader),
 		comments:      reviewReader,
 
-		list:         query.NewListTypesHandler(typeReader),
-		create:       command.NewCreateTypeHandler(typeWriter),
-		update:       command.NewUpdateTypeHandler(typeWriter),
-		createReview: command.NewCreateReviewHandler(reviewWriter, reviewReader, tx, pub),
-		updateReview: command.NewUpdateReviewHandler(reviewWriter, reviewReader, tx, pub),
-		deleteReview: command.NewDeleteReviewHandler(reviewWriter),
-		getReview:    query.NewGetReviewHandler(reviewReader),
-		listReviews:  query.NewListReviewsHandler(reviewReader),
-		voteReview:   command.NewVoteReviewHandler(reviewWriter, tx, pub),
-		viewReview:   command.NewViewReviewHandler(reviewWriter, tx, pub),
-		listReasons:  query.NewListReasonsHandler(typeReader),
-		createReport: command.NewCreateReportHandler(reviewWriter, typeReader, tx, pub, threshold),
-		types:        typeReader,
-		users:        deps.Users,
-		admin:        deps.Admin,
-		auth:         deps.Auth,
+		list:          query.NewListTypesHandler(typeReader),
+		create:        command.NewCreateTypeHandler(typeWriter),
+		update:        command.NewUpdateTypeHandler(typeWriter),
+		createReview:  command.NewCreateReviewHandler(reviewWriter, reviewReader),
+		saveDraft:     command.NewSaveDraftHandler(reviewWriter, reviewReader, tx),
+		publishReview: command.NewPublishReviewHandler(reviewWriter, reviewReader, tx, pub),
+		editorReview:  query.NewEditorReviewHandler(reviewReader),
+		deleteReview:  command.NewDeleteReviewHandler(reviewWriter),
+		getReview:     query.NewGetReviewHandler(reviewReader),
+		listReviews:   query.NewListReviewsHandler(reviewReader),
+		voteReview:    command.NewVoteReviewHandler(reviewWriter, tx, pub),
+		viewReview:    command.NewViewReviewHandler(reviewWriter, tx, pub),
+		listReasons:   query.NewListReasonsHandler(typeReader),
+		createReport:  command.NewCreateReportHandler(reviewWriter, typeReader, tx, pub, threshold),
+		types:         typeReader,
+		users:         deps.Users,
+		admin:         deps.Admin,
+		auth:          deps.Auth,
 	}
 }
 
@@ -136,20 +140,22 @@ func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) 
 		CreateComment: m.createComment,
 		ListComments:  m.listComments,
 
-		ListTypes:    m.list,
-		CreateType:   m.create,
-		UpdateType:   m.update,
-		Statuses:     m.statusCatalog(),
-		CreateReview: m.createReview,
-		UpdateReview: m.updateReview,
-		DeleteReview: m.deleteReview,
-		GetReview:    m.getReview,
-		ListReviews:  m.listReviews,
-		VoteReview:   m.voteReview,
-		ViewReview:   m.viewReview,
-		ListReasons:  m.listReasons,
-		CreateReport: m.createReport,
-		Users:        m.users,
+		ListTypes:     m.list,
+		CreateType:    m.create,
+		UpdateType:    m.update,
+		Statuses:      m.statusCatalog(),
+		CreateReview:  m.createReview,
+		SaveDraft:     m.saveDraft,
+		PublishReview: m.publishReview,
+		EditorReview:  m.editorReview,
+		DeleteReview:  m.deleteReview,
+		GetReview:     m.getReview,
+		ListReviews:   m.listReviews,
+		VoteReview:    m.voteReview,
+		ViewReview:    m.viewReview,
+		ListReasons:   m.listReasons,
+		CreateReport:  m.createReport,
+		Users:         m.users,
 	}), m.admin, m.auth, profileAccess)
 }
 

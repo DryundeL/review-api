@@ -1,7 +1,7 @@
 name: review-api
 
 x-app: &app
-  image: review-api:${APP_VERSION:-local}
+  image: ghcr.io/dryundel/review-api:${APP_VERSION:-local}
   build: .
   restart: unless-stopped
   read_only: true

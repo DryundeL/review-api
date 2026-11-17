@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  DEPLOY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+  IMAGE: ghcr.io/dryundel/review-api
 
 jobs:
   test:
@@ -45,68 +45,68 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Build image
-        run: docker build --tag "review-api:$GITHUB_SHA" .
-      - name: Package release
-        if: env.DEPLOY == 'true'
+        run: docker build --tag "$IMAGE:$GITHUB_SHA" .
+      - name: Push image
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          out="$RUNNER_TEMP/out"
-          release="$RUNNER_TEMP/release"
-          mkdir -p "$out" "$release/deploy"
-          docker save "review-api:$GITHUB_SHA" | gzip > "$release/image.tar.gz"
-          cp compose.yaml deploy/pull.sh "$release/"
-          cp deploy/redis-entrypoint.sh "$release/deploy/"
-          printf '%s\n' "$GITHUB_SHA" > "$release/.release-version"
-          tar -czf "$out/release.tar.gz" -C "$release" .
-          cp deploy/pull.sh "$out/"
-      - if: env.DEPLOY == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: release
-          path: ${{ runner.temp }}/out/
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
+          set -euo pipefail
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          # Unchanged layers (the Alpine base) are already in the registry.
+          docker push --quiet "$IMAGE:$GITHUB_SHA"
+          docker logout ghcr.io
 
   deploy:
     needs: [test, build]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Read-only token: the server receives it only to pull this release.
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          name: release
-          path: ${{ runner.temp }}/release
+          persist-credentials: false
       - name: Deploy to server
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$DEPLOY_SSH_KEY"
           test -n "$DEPLOY_KNOWN_HOSTS"
           umask 077
-          ssh_dir=$(mktemp -d "$RUNNER_TEMP/deploy-ssh.XXXXXX")
-          trap 'rm -rf "$ssh_dir"' EXIT
-          printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_dir/key"
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
-          # One multiplexed connection serves both commands.
-          options=(-i "$ssh_dir/key" -o "UserKnownHostsFile=$ssh_dir/known_hosts"
-            -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes
-            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4
-            -o ControlMaster=auto -o "ControlPath=$ssh_dir/mux" -o ControlPersist=60)
-          target=wapp@194.146.223.221
-          upload_id="$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
-          incoming="/home/wapp/.local/share/review-api/incoming/$GITHUB_SHA.$upload_id"
-          release="$RUNNER_TEMP/release"
-          ssh "${options[@]}" "$target" \
-            "umask 077 && mkdir -p '$incoming' && cat > '$incoming/release.tar.gz'" \
-            < "$release/release.tar.gz"
-          ssh "${options[@]}" "$target" "sh -s -- --activate $GITHUB_SHA $upload_id" \
-            < "$release/pull.sh"
-          ssh "${options[@]}" -O exit "$target" 2>/dev/null || true
+          work=$(mktemp -d "$RUNNER_TEMP/deploy.XXXXXX")
+          trap 'rm -rf "$work"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$work/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$work/known_hosts"
+
+          # Small config bundle (a few KB); the image is pulled from GHCR.
+          mkdir -p "$work/release/deploy"
+          cp compose.yaml deploy/pull.sh deploy/activate.sh "$work/release/"
+          cp deploy/redis-entrypoint.sh "$work/release/deploy/"
+          printf '%s\n' "$GITHUB_SHA" > "$work/release/.release-version"
+          printf '%s\n' "$GITHUB_ACTOR" > "$work/release/.registry-user"
+          printf '%s' "$REGISTRY_TOKEN" > "$work/release/.registry-token"
+          tar -czf "$work/release.tar.gz" -C "$work/release" .
+
+          # One SSH session: unpack the bundle into a private directory and activate.
+          incoming=/home/wapp/.local/share/review-api/incoming
+          remote=$(printf 'set -eu; umask 077; mkdir -p %s; d=$(mktemp -d %s/%s.XXXXXX); trap '"'"'rm -rf "$d"'"'"' EXIT; tar -xzf - -C "$d"; sh "$d/activate.sh" %s "$d" </dev/null' \
+            "$incoming" "$incoming" "$GITHUB_SHA" "$GITHUB_SHA")
+          ssh -i "$work/key" -o "UserKnownHostsFile=$work/known_hosts" \
+            -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            wapp@194.146.223.221 "$remote" < "$work/release.tar.gz"

@@ -26,7 +26,7 @@ docker compose config --quiet
 if "$build"; then
   docker compose build app
 else
-  docker image inspect "review-api:${APP_VERSION:?Release version required}" >/dev/null
+  docker image inspect "ghcr.io/dryundel/review-api:${APP_VERSION:?Release version required}" >/dev/null
 fi
 # API applies embedded migrations before serving requests. Stop the old worker
 # and bot first so that they cannot process records against a changing schema.

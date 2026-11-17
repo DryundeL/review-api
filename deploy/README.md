@@ -56,7 +56,7 @@ Compose запускается из каталога конкретного ре
 mkdir -p /home/wapp/apps/review-api/storage
 docker --context rootless run --rm --user 0:0 --network none \
   --mount type=bind,src=/home/wapp/apps/review-api/storage,dst=/storage \
-  --entrypoint /bin/sh review-api:<SHA> \
+  --entrypoint /bin/sh ghcr.io/dryundel/review-api:<SHA> \
   -c 'chown 10001:10001 /storage && chmod 755 /storage'
 ```
 
@@ -92,10 +92,18 @@ API загрузки. При прямой раздаче фронтендом ф
 ## Автодеплой
 
 Push в `main` запускает `.github/workflows/deploy.yml`. Параллельно идут
-`test` (форматирование, `go vet`, race-тесты) и `build` (Docker-образ и архив
-релиза). После обоих job `deploy` одним SSH-соединением загружает архив и
-вызывает `pull.sh` с SHA нового релиза. Pull request запускает только проверки
-и сборку, устаревшие запуски PR отменяются. Есть ручной запуск для `main`.
+`test` (форматирование, `go vet`, race-тесты) и `build` (сборка образа и push в
+`ghcr.io/dryundel/review-api:<SHA>`). После обоих job `deploy` одним
+SSH-подключением передаёт архив конфигурации (несколько КБ) и запускает
+`deploy/activate.sh`. Тот берёт общий lock, скачивает образ из GHCR (только
+изменившиеся слои), устанавливает релиз и вызывает `pull.sh`. Pull request
+запускает только проверки и сборку, устаревшие запуски PR отменяются.
+Есть ручной запуск для `main`.
+
+Для `docker pull` на сервер передаётся временный read-only `GITHUB_TOKEN`
+(`packages: read`), действующий до конца job. Он хранится только во временном
+`DOCKER_CONFIG` внутри каталога доставки и удаляется вместе с ним; в `~/.docker`
+учётные данные registry не сохраняются.
 
 Healthcheck API и PostgreSQL во время старта опрашиваются каждые 2 секунды
 (`start_interval`), затем раз в минуту, поэтому деплой не ждёт полный интервал.
@@ -107,10 +115,10 @@ GitHub Actions Secrets: `DEPLOY_SSH_KEY` — отдельный ключ `wapp`,
 
 Служебные файлы находятся в `/home/wapp/.local/share/review-api`:
 
-- `releases/<SHA>` — Compose и скрипт релиза;
+- `releases/<SHA>` — Compose и `deploy/redis-entrypoint.sh` релиза;
 - `current` — ссылка на последний успешно запущенный релиз;
-- `incoming` — временные архивы доставки;
-- `previous` — ссылка на предыдущий успешно запущенный релиз.
+- `previous` — ссылка на предыдущий успешно запущенный релиз;
+- `incoming` — временные каталоги доставки.
 
 При неготовности API скрипт завершается ошибкой,
 worker и bot остаются остановленными; ссылка `current` не меняется. Это не
@@ -120,15 +128,16 @@ zero-downtime деплой. Проверка worker и bot подтвержда�
 Автодеплой и ручной `pull.sh` обоих проектов используют один `flock` на
 `/home/wapp/.local/share/review-deploy.lock` (ожидание до 15 минут). Файл
 блокировки не удалять. На сервере нужны `flock` и Docker Compose с `--wait`.
-Docker вызывается через `/run/user/1000/docker.sock` после проверки
-rootless-режима. Если изменится UID пользователя `wapp`, обновите путь в скрипте.
+Docker вызывается через `/run/user/1000/docker.sock`. Если изменится UID
+пользователя `wapp`, обновите путь в скриптах.
 
-После успешного запуска остаются только образы `current` и `previous`:
-остальные теги `review-api:*` удаляются (образ, занятый контейнером, Docker
-не удалит — скрипт выведет предупреждение), затем `docker image prune -f`
-удаляет dangling-образы на rootless-демоне. Архивы неудачных доставок в
-`incoming` удаляются через сутки. Каталоги `releases/<SHA>` сохраняются:
-Redis монтирует entrypoint из каталога релиза, в котором был создан.
+После успешного запуска остаются только релизы и образы `current` и
+`previous`. Остальные теги `ghcr.io/dryundel/review-api:*` и старые
+`review-api:*` удаляются (образ, занятый контейнером, Docker не удалит —
+скрипт выведет предупреждение), затем `docker image prune -f` удаляет
+dangling-образы. Каталог релиза сохраняется, пока его монтирует контейнер:
+Redis использует entrypoint из релиза, в котором был создан. Брошенные
+каталоги `incoming` удаляются через сутки.
 
 ## Проверка и откат
 
@@ -137,7 +146,8 @@ curl --fail http://127.0.0.1:8080/readyz
 docker --context rootless logs --tail=100 review-api-worker-1
 ```
 
-Откат на сохранённый совместимый образ:
+Откат возможен только на `previous` (`readlink .../review-api/previous`):
+его образ уже есть локально, registry не нужен.
 
 ```sh
 sh /home/wapp/apps/review-api/pull.sh <PREVIOUS_SHA>

@@ -1,21 +1,18 @@
 #!/bin/sh
-# Usage:
-#   pull.sh                              restart the current release
-#   pull.sh <SHA>                        switch to an already loaded release (rollback)
-#   pull.sh --activate <SHA> <UPLOAD_ID> install an uploaded release (CI)
+# Usage: pull.sh [commit-sha]  — activate a release (default: current).
+# Only the current and previous releases and their images are kept.
 set -eu
-umask 077
-[ "$(id -un)" = wapp ] || { echo 'Run as wapp only.' >&2; exit 1; }
+[ "$(id -un)" = wapp ] || { echo 'Run as wapp only (without sudo).' >&2; exit 1; }
+[ "$#" -le 1 ] || { echo 'Usage: pull.sh [commit-sha]' >&2; exit 1; }
 
 project=review-api
+image=ghcr.io/dryundel/review-api
 root="/home/wapp/apps/$project"
 share=/home/wapp/.local/share
 state="$share/$project"
 unset DOCKER_CONTEXT
 export DOCKER_HOST=unix:///run/user/1000/docker.sock
 
-# CI streams this script through stdin, so no child may read it.
-docker() { command docker "$@" </dev/null; }
 die() { echo "$*" >&2; exit 1; }
 valid_sha() {
   case "$1" in ''|*[!0-9a-f]*) return 1 ;; esac
@@ -28,51 +25,22 @@ release_of() {
   echo "$sha"
 }
 
-upload=
-case "${1:-}" in
-  --activate)
-    [ "$#" -eq 3 ] || die 'Usage: pull.sh --activate <SHA> <UPLOAD_ID>'
-    case "$3" in *[!0-9.]*|.*|*.|*..*|'') die 'Invalid upload id.' ;; esac
-    revision=$2
-    upload="$state/incoming/$revision.$3/release.tar.gz"
-    ;;
-  *)
-    [ "$#" -le 1 ] || die 'Usage: pull.sh [<SHA>]'
-    revision=${1:-$(release_of current)}
-    ;;
-esac
-valid_sha "$revision" || die 'Invalid commit SHA.'
-
-mkdir -p "$root" "$state/releases"
-# Shared with the other Review project. Never remove this lock file.
-exec 9>>"$share/review-deploy.lock"
-flock -w 900 9 || die 'Timed out waiting for the Review deployment lock.'
-
-docker info --format '{{range .SecurityOptions}}{{println .}}{{end}}' | grep -qx name=rootless ||
-  die 'Rootless Docker is unavailable.'
-test -f "$root/.env" || die "Missing $root/.env."
-
-current=$(release_of current)
-previous=$(release_of previous)
-release="$state/releases/$revision"
-
-stage=
-trap '[ -z "$stage" ] || rm -rf -- "$stage"' EXIT
-if [ -n "$upload" ]; then
-  stage=$(mktemp -d "$state/releases/.stage.XXXXXXXX")
-  tar --no-same-owner --no-same-permissions -xzf "$upload" -C "$stage"
-  [ "$(cat "$stage/.release-version")" = "$revision" ] || die 'Release version mismatch.'
-  if [ ! -d "$release" ]; then
-    mkdir "$stage/config"
-    mv -- "$stage/compose.yaml" "$stage/.release-version" "$stage/deploy" "$stage/config/"
-    mv -T -- "$stage/config" "$release"
-  fi
-  # A rerun of the same commit must not replace an already deployed tag.
-  docker image inspect "$project:$revision" >/dev/null 2>&1 ||
-    docker load -q -i "$stage/image.tar.gz"
+# Shared with review-app. activate.sh already holds it during CI deploys.
+if [ "${REVIEW_DEPLOY_LOCKED:-}" != 1 ]; then
+  exec 9>>"$share/review-deploy.lock"
+  flock -w 900 9 || die 'Timed out waiting for the Review deployment lock.'
 fi
+
+revision=${1:-$(release_of current)}
+valid_sha "$revision" || die 'Invalid commit SHA.'
+release="$state/releases/$revision"
 [ "$(cat "$release/.release-version")" = "$revision" ] || die "Release $revision is not installed."
-docker image inspect "$project:$revision" >/dev/null 2>&1 || die "Image $project:$revision is not loaded."
+if ! docker image inspect "$image:$revision" >/dev/null 2>&1; then
+  # Releases deployed before GHCR were loaded as review-api:<sha>.
+  docker image inspect "$project:$revision" >/dev/null 2>&1 || die "Image $image:$revision is not available."
+  docker tag "$project:$revision" "$image:$revision"
+fi
+test -f "$root/.env" || die "Missing $root/.env."
 
 export APP_VERSION="$revision" APP_ENV_FILE="$root/.env"
 cd "$release"
@@ -81,36 +49,51 @@ compose config --quiet
 compose up -d --no-build --no-recreate --wait --wait-timeout 120 postgres redis
 compose stop worker bot
 # API applies migrations before becoming ready. Do not restart the databases.
-compose up -d --no-build --pull never --no-deps --force-recreate --wait --wait-timeout 120 app
+compose up -d --no-build --pull never --no-deps --force-recreate --wait --wait-timeout 180 app
 compose up -d --no-build --pull never --no-deps --force-recreate --wait --wait-timeout 90 worker bot
 
 set_ref() {
   ln -sfn "$state/releases/$2" "$state/$1.next"
   mv -Tf "$state/$1.next" "$state/$1"
 }
+current=$(release_of current)
+previous=$(release_of previous)
 if [ -n "$current" ] && [ "$current" != "$revision" ]; then
   previous=$current
   set_ref previous "$previous"
 fi
 set_ref current "$revision"
 
-if [ -n "$upload" ]; then
-  install -m 700 "$stage/pull.sh" "$root/pull.sh.next"
-  mv -Tf "$root/pull.sh.next" "$root/pull.sh"
-  rm -rf -- "${upload%/*}"
+# Keep the current and previous releases, and any release a container still
+# bind-mounts (Redis keeps the entrypoint of the release it was created from).
+if ids=$(docker container ls -aq) &&
+  mounts=$(if [ -n "$ids" ]; then docker container inspect --format '{{range .Mounts}}{{println .Source}}{{end}}' $ids; fi); then
+  for dir in "$state"/releases/*; do
+    name=${dir##*/}
+    valid_sha "$name" || continue
+    case "$name" in "$revision"|"$previous") continue ;; esac
+    case "
+$mounts" in *"
+$dir/"*) continue ;; esac
+    rm -rf -- "$dir"
+  done
+else
+  echo 'Warning: release cleanup skipped.' >&2
 fi
 
-# Keep only the current and previous images. Docker refuses to remove an image
-# used by any container, so a failed removal is reported and skipped.
-docker image ls --format '{{.Tag}}' "$project" | while read -r tag; do
-  case "$tag" in "$revision"|"$previous"|'<none>') continue ;; esac
-  docker image rm "$project:$tag" >/dev/null || echo "Warning: kept $project:$tag." >&2
+# Docker refuses to remove an image used by a container, so a failed removal
+# is only reported.
+for repo in "$image" "$project"; do
+  docker image ls --format '{{.Tag}}' "$repo" | while read -r tag; do
+    case "$tag" in "$revision"|"$previous"|'<none>') continue ;; esac
+    docker image rm "$repo:$tag" >/dev/null || echo "Warning: kept $repo:$tag." >&2
+  done
 done
 docker image prune -f >/dev/null || echo 'Warning: dangling image cleanup failed.' >&2
 
-# Uploads of failed deployments.
+# Bundles left by interrupted deployments.
 [ ! -d "$state/incoming" ] ||
-  find "$state/incoming" -mindepth 1 -maxdepth 1 -type d -mmin +1440 -exec rm -rf -- {} + ||
+  find "$state/incoming" -mindepth 1 -maxdepth 1 -mmin +1440 -exec rm -rf -- {} + ||
   echo 'Warning: incoming cleanup failed.' >&2
 
 compose ps

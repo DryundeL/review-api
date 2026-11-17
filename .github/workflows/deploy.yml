@@ -17,7 +17,7 @@ concurrency:
 jobs:
   verify-and-deploy:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -66,7 +66,9 @@ jobs:
             -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes
             -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
           target=wapp@194.146.223.221
-          ssh "${options[@]}" "$target" "mkdir -p /home/wapp/.local/share/review-api/incoming/$GITHUB_SHA"
+          upload_id="$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
+          incoming="/home/wapp/.local/share/review-api/incoming/$GITHUB_SHA.$upload_id"
+          ssh "${options[@]}" "$target" "umask 077 && mkdir -p '$incoming'"
           scp "${options[@]}" "$RUNNER_TEMP/release.tar.gz" \
-            "$target:/home/wapp/.local/share/review-api/incoming/$GITHUB_SHA/release.tar.gz"
-          ssh "${options[@]}" "$target" "sh -s -- $GITHUB_SHA" < deploy/activate.sh
+            "$target:$incoming/release.tar.gz"
+          ssh "${options[@]}" "$target" "sh -s -- --activate $GITHUB_SHA $upload_id" < deploy/pull.sh

@@ -48,13 +48,13 @@ Docker build context.
 переменная отсутствует. Не используйте относительный путь на сервере:
 Compose запускается из каталога конкретного релиза.
 
-Перед первым деплоем с mount создайте папку и настройте владельца в
-пространстве UID rootless Docker. Выполняйте от `wapp`, без sudo; вместо
+Перед первым деплоем с mount создайте папку и настройте владельца
+(UID 10001 пользователя приложения в контейнере). Выполняйте от `wapp`, без sudo; вместо
 `<SHA>` укажите тег уже загруженного образа:
 
 ```sh
 mkdir -p /home/wapp/apps/review-api/storage
-docker --context rootless run --rm --user 0:0 --network none \
+docker run --rm --user 0:0 --network none \
   --mount type=bind,src=/home/wapp/apps/review-api/storage,dst=/storage \
   --entrypoint /bin/sh ghcr.io/dryundel/review-api:<SHA> \
   -c 'chown 10001:10001 /storage && chmod 755 /storage'
@@ -128,8 +128,8 @@ zero-downtime деплой. Проверка worker и bot подтвержда�
 Автодеплой и ручной `pull.sh` обоих проектов используют один `flock` на
 `/home/wapp/.local/share/review-deploy.lock` (ожидание до 15 минут). Файл
 блокировки не удалять. На сервере нужны `flock` и Docker Compose с `--wait`.
-Docker вызывается через `/run/user/1000/docker.sock`. Если изменится UID
-пользователя `wapp`, обновите путь в скриптах.
+Docker вызывается через системный демон `/var/run/docker.sock`; пользователь
+`wapp` должен состоять в группе `docker`.
 
 После успешного запуска остаются только релизы и образы `current` и
 `previous`. Остальные теги `ghcr.io/dryundel/review-api:*` и старые
@@ -143,7 +143,7 @@ Redis использует entrypoint из релиза, в котором бы�
 
 ```sh
 curl --fail http://127.0.0.1:8080/readyz
-docker --context rootless logs --tail=100 review-api-worker-1
+docker logs --tail=100 review-api-worker-1
 ```
 
 Откат возможен только на `previous` (`readlink .../review-api/previous`):
@@ -160,7 +160,7 @@ sh /home/wapp/apps/review-api/pull.sh <PREVIOUS_SHA>
 
 ```sh
 umask 077
-docker --context rootless exec review-api-postgres-1 pg_dump -U review -d review -Fc > "$HOME/backups/review-$(date +%Y%m%d-%H%M%S).dump"
+docker exec review-api-postgres-1 pg_dump -U review -d review -Fc > "$HOME/backups/review-$(date +%Y%m%d-%H%M%S).dump"
 ```
 
 Копируйте резервные копии за пределы сервера и проверяйте восстановление.
@@ -183,5 +183,5 @@ ssh -N -L 8080:127.0.0.1:8080 -i ~/.ssh/my_server wapp@194.146.223.221
 
 Из клона репозитория на Linux: создайте `.env` по `deploy/env.example`,
 заполните секреты и выполните `sh deploy/deploy.sh`.
-Production использует rootless Docker пользователя `wapp` с автозапуском
-user service и `loginctl enable-linger wapp`.
+Production использует системный Docker (`docker.service`); `wapp` входит
+в группу `docker`, что равносильно root-доступу к хосту.

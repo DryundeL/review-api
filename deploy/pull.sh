@@ -11,7 +11,7 @@ root="/home/wapp/apps/$project"
 share=/home/wapp/.local/share
 state="$share/$project"
 unset DOCKER_CONTEXT
-export DOCKER_HOST=unix:///run/user/1000/docker.sock
+export DOCKER_HOST=unix:///var/run/docker.sock
 
 die() { echo "$*" >&2; exit 1; }
 valid_sha() {

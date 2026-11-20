@@ -31,7 +31,7 @@ export REVIEW_DEPLOY_LOCKED=1
 # The CI token lives only in a temporary Docker config inside the bundle,
 # which the caller removes; ~/.docker keeps no registry credentials.
 registry_docker() {
-  env -u DOCKER_CONTEXT DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock" \
+  env -u DOCKER_CONTEXT DOCKER_HOST=unix:///var/run/docker.sock \
     DOCKER_CONFIG="$bundle/docker" docker "$@"
 }
 mkdir -p "$bundle/docker"

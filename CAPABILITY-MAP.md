@@ -15,7 +15,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | platform | infra, не BC | pgx pool, Redis, Goose, outbox, eventbus, Echo, slog, OTel, Prometheus, health | — |
 | auth | BC | Вход из браузера через подтверждение в боте и JWT; проверка Telegram `initData` | platform |
 | users | BC | Профиль, аватар, `popularity_score`, EnsureUser по Telegram identity | auth (contract), media |
-| media | BC | Upload, magic-bytes, лимиты, S3-compatible, без SVG | auth |
+| media | BC | Загрузка изображений (`media_images`): JPEG/PNG/WebP по magic bytes, ≤300 КБ, ≤4096 px, вырезание EXIF/XMP/текстовых чанков без перекодирования, квота загрузок на пользователя. Хранение — локальный диск (`MEDIA_STORAGE_DIR`), S3 — будущая реализация того же порта. Без SVG и GIF | auth, users |
 | catalog | BC | Тайтлы (`media_objects`): название, type, год, poster, `release_status`, поиск; пакетный импорт только admin | auth, media, reviews (коды типов) |
 | reviews | BC | Один обзор на произведение: рабочая версия (`draft_*`, `revision`) и публичная (`title`, `rating`, `body`); единый HTML-текст ≤20 000 символов (`review_blocks` — legacy, только для отката), голоса (`review_votes`), просмотры (`review_views`), жалобы (`review_reports` + `report_reasons`, автоснятие по порогу). Справочник `review_types`. Статусы — конфиг модуля | catalog, media, users |
 | social | BC | Подписки (`follows`) | users |

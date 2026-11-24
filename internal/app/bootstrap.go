@@ -81,6 +81,7 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		Sitemap:       modules.Sitemap,
 		Notifications: modules.Notifications,
 		Gamification:  modules.Gamification,
+		Media:         modules.Media,
 	}, routes.APIOptions{
 		Redis:           rdb,
 		RateLimitPerMin: cfg.App.RateLimitPerMin,

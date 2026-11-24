@@ -13,6 +13,7 @@ import (
 	catalogcontract "review-api/internal/modules/catalog/contract"
 	"review-api/internal/modules/feed"
 	"review-api/internal/modules/gamification"
+	"review-api/internal/modules/media"
 	"review-api/internal/modules/notifications"
 	"review-api/internal/modules/reviews"
 	reviewscontract "review-api/internal/modules/reviews/contract"
@@ -37,6 +38,7 @@ type Modules struct {
 	Sitemap       *sitemap.Module
 	Notifications *notifications.Module
 	Gamification  *gamification.Module
+	Media         *media.Module
 }
 
 func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modules {
@@ -113,11 +115,21 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		},
 	})
 	usersMod.SetCosmetics(gamificationMod)
+	mediaMod := media.New(media.Dependencies{
+		Pool:           pool,
+		Redis:          rdb,
+		Auth:           authMod.Middlewares.Bearer,
+		Users:          usersMod,
+		StorageDir:     cfg.App.MediaStorageDir,
+		PublicPrefix:   cfg.App.MediaPublicPrefix,
+		UploadsPerHour: cfg.App.MediaUploadsPerHour,
+	})
 	return Modules{
 		Auth: authMod, Users: usersMod, Reviews: reviewsMod,
 		Catalog: catalogMod, Social: socialMod, Feed: feedMod, Search: searchMod,
 		Sitemap:       sitemap.New(sitemap.Dependencies{Pool: pool}),
 		Notifications: notificationsMod, Gamification: gamificationMod,
+		Media: mediaMod,
 	}
 }
 

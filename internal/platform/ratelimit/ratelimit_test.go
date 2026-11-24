@@ -59,3 +59,21 @@ func TestHitKeepsWindowAndRepairsKeyWithoutTTL(t *testing.T) {
 		t.Fatalf("stuck key ttl = %v, want %v", ttl, time.Minute)
 	}
 }
+
+func TestAllowCountsPerKey(t *testing.T) {
+	t.Parallel()
+	_, client := newClient(t)
+	ctx := context.Background()
+	for i := 1; i <= 3; i++ {
+		ok, err := Allow(ctx, client, "rl:u1", 2, time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := i <= 2; ok != want {
+			t.Fatalf("attempt %d: ok = %v, want %v", i, ok, want)
+		}
+	}
+	if ok, _ := Allow(ctx, client, "rl:u2", 2, time.Hour); !ok {
+		t.Fatal("other key must have its own window")
+	}
+}

@@ -39,6 +39,9 @@ func TestValidateRequiresSecrets(t *testing.T) {
 			Env:                 "development",
 			RateLimitPerMin:     60,
 			WorkerBatch:         50,
+			MediaStorageDir:     "storage",
+			MediaPublicPrefix:   "/storage",
+			MediaUploadsPerHour: 120,
 			ReportHideThreshold: 10,
 		},
 	}
@@ -81,6 +84,9 @@ func TestValidateReportHideThreshold(t *testing.T) {
 			AdminToken:          strings.Repeat("a", 32),
 			RateLimitPerMin:     60,
 			WorkerBatch:         50,
+			MediaStorageDir:     "storage",
+			MediaPublicPrefix:   "/storage",
+			MediaUploadsPerHour: 120,
 			ReportHideThreshold: 0,
 		},
 	}
@@ -90,5 +96,36 @@ func TestValidateReportHideThreshold(t *testing.T) {
 	cfg.App.ReportHideThreshold = 10
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidateMedia(t *testing.T) {
+	t.Parallel()
+	valid := func() *Config {
+		return &Config{
+			Database: DatabaseConfig{Host: "h", Port: "5432", DBName: "d", Password: "p"},
+			Redis:    RedisConfig{Host: "h", Port: "6379"},
+			App: AppConfig{
+				Env: "development", TelegramBotToken: "tok", TelegramBotUsername: "review_bot",
+				JWTSecret: strings.Repeat("s", 32), AdminToken: strings.Repeat("a", 32),
+				RateLimitPerMin: 60, WorkerBatch: 50, ReportHideThreshold: 10,
+				MediaStorageDir: "storage", MediaPublicPrefix: "/storage", MediaUploadsPerHour: 120,
+			},
+		}
+	}
+	if err := valid().Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*Config){
+		"empty dir":         func(c *Config) { c.App.MediaStorageDir = "" },
+		"http prefix":       func(c *Config) { c.App.MediaPublicPrefix = "http://cdn.example" },
+		"relative prefix":   func(c *Config) { c.App.MediaPublicPrefix = "storage" },
+		"zero upload quota": func(c *Config) { c.App.MediaUploadsPerHour = 0 },
+	} {
+		cfg := valid()
+		mutate(cfg)
+		if err := cfg.Validate(); err == nil {
+			t.Fatalf("%s: expected error", name)
+		}
 	}
 }

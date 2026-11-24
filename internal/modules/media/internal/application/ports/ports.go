@@ -24,6 +24,8 @@ type ImageWriter interface {
 	// LockUnattached locks up to limit unattached rows created before cutoff (SKIP LOCKED). Requires a TX.
 	LockUnattached(ctx context.Context, cutoff time.Time, limit int) ([]ImageRecord, error)
 	DeleteByIDs(ctx context.Context, ids []uuid.UUID) error
+	// Attach marks the owner's images as used and returns those found. Idempotent; joins the caller's TX.
+	Attach(ctx context.Context, ownerID uuid.UUID, ids []uuid.UUID) ([]ImageRecord, error)
 }
 
 // FileStore persists image bytes under a server-generated key.

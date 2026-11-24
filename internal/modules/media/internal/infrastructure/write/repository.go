@@ -57,11 +57,7 @@ func (r *Repository) LockUnattached(ctx context.Context, cutoff time.Time, limit
 	if err != nil {
 		return nil, fmt.Errorf("lock unattached images: %w", err)
 	}
-	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (ports.ImageRecord, error) {
-		var it ports.ImageRecord
-		err := row.Scan(&it.ID, &it.OwnerID, &it.StorageKey, &it.ContentType, &it.SizeBytes, &it.Width, &it.Height, &it.CreatedAt)
-		return it, err
-	})
+	items, err := pgx.CollectRows(rows, scanImage)
 	if err != nil {
 		return nil, fmt.Errorf("scan unattached images: %w", err)
 	}
@@ -81,4 +77,36 @@ func (r *Repository) DeleteByIDs(ctx context.Context, ids []uuid.UUID) error {
 		return fmt.Errorf("delete images: %w", err)
 	}
 	return nil
+}
+
+func (r *Repository) Attach(ctx context.Context, ownerID uuid.UUID, ids []uuid.UUID) ([]ports.ImageRecord, error) {
+	const query = `
+		UPDATE media_images SET attached_at = COALESCE(attached_at, NOW())
+		WHERE owner_id = $1 AND id = ANY($2)
+		RETURNING id, owner_id, storage_key, content_type, size_bytes, width, height, created_at`
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if tx, ok := transaction.TxFromContext(ctx); ok {
+		rows, err = tx.Query(ctx, query, ownerID, ids)
+	} else if r != nil && r.pool != nil {
+		rows, err = r.pool.Query(ctx, query, ownerID, ids)
+	} else {
+		return nil, contract.ErrInvalid
+	}
+	if err != nil {
+		return nil, fmt.Errorf("attach images: %w", err)
+	}
+	items, err := pgx.CollectRows(rows, scanImage)
+	if err != nil {
+		return nil, fmt.Errorf("attach images: %w", err)
+	}
+	return items, nil
+}
+
+func scanImage(row pgx.CollectableRow) (ports.ImageRecord, error) {
+	var it ports.ImageRecord
+	err := row.Scan(&it.ID, &it.OwnerID, &it.StorageKey, &it.ContentType, &it.SizeBytes, &it.Width, &it.Height, &it.CreatedAt)
+	return it, err
 }

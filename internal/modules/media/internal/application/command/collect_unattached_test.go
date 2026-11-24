@@ -27,6 +27,18 @@ func (r *gcRepo) LockUnattached(_ context.Context, cutoff time.Time, limit int) 
 	return r.items, nil
 }
 
+func (r *gcRepo) Attach(_ context.Context, _ uuid.UUID, ids []uuid.UUID) ([]ports.ImageRecord, error) {
+	out := []ports.ImageRecord{}
+	for _, it := range r.items {
+		for _, id := range ids {
+			if it.ID == id {
+				out = append(out, it)
+			}
+		}
+	}
+	return out, nil
+}
+
 func (r *gcRepo) DeleteByIDs(_ context.Context, ids []uuid.UUID) error {
 	r.deleted = append(r.deleted, ids...)
 	return nil

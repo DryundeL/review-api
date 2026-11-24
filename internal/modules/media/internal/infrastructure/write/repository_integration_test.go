@@ -124,4 +124,46 @@ func TestInsertImageIntegration(t *testing.T) {
 	if len(left) != 2 || left[0] != attached.ID || left[1] != fresh.ID {
 		t.Fatalf("left = %v", left)
 	}
+
+	// Attach: only the owner's images, idempotent, rolls back with the caller's TX.
+	other := uuid.New()
+	if _, err := pool.Exec(ctx, `INSERT INTO users (id, telegram_id, first_name) VALUES ($1, 2, 'Bob')`, other); err != nil {
+		t.Fatal(err)
+	}
+	mine := valid()
+	if err := repo.Insert(ctx, mine); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.Attach(ctx, other, []uuid.UUID{mine.ID})
+	if err != nil || len(got) != 0 {
+		t.Fatalf("foreign attach: %v %v", got, err)
+	}
+	rollback := errors.New("rollback")
+	err = transaction.NewPgxManager(pool).WithinTransaction(ctx, func(txCtx context.Context) error {
+		got, err := repo.Attach(txCtx, owner, []uuid.UUID{mine.ID})
+		if err != nil || len(got) != 1 {
+			t.Fatalf("attach in tx: %v %v", got, err)
+		}
+		return rollback
+	})
+	if !errors.Is(err, rollback) {
+		t.Fatal(err)
+	}
+	var attachedAt *time.Time
+	if err := pool.QueryRow(ctx, `SELECT attached_at FROM media_images WHERE id=$1`, mine.ID).Scan(&attachedAt); err != nil || attachedAt != nil {
+		t.Fatalf("attach must roll back: %v %v", attachedAt, err)
+	}
+	first, err := repo.Attach(ctx, owner, []uuid.UUID{mine.ID})
+	if err != nil || len(first) != 1 {
+		t.Fatalf("attach: %v %v", first, err)
+	}
+	var t1, t2 time.Time
+	_ = pool.QueryRow(ctx, `SELECT attached_at FROM media_images WHERE id=$1`, mine.ID).Scan(&t1)
+	if _, err := repo.Attach(ctx, owner, []uuid.UUID{mine.ID}); err != nil {
+		t.Fatal(err)
+	}
+	_ = pool.QueryRow(ctx, `SELECT attached_at FROM media_images WHERE id=$1`, mine.ID).Scan(&t2)
+	if !t1.Equal(t2) {
+		t.Fatalf("attached_at changed on repeat: %v -> %v", t1, t2)
+	}
 }

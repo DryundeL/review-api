@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
 
+	"review-api/internal/modules/media/contract"
 	"review-api/internal/modules/media/internal/application/command"
 	mediahttp "review-api/internal/modules/media/internal/delivery/http"
 	"review-api/internal/modules/media/internal/infrastructure/quota"
@@ -37,6 +38,7 @@ type Dependencies struct {
 type Module struct {
 	upload       *command.UploadImageHandler
 	collect      *command.CollectUnattachedHandler
+	attach       *command.AttachImagesHandler
 	users        UserResolver
 	auth         echo.MiddlewareFunc
 	publicPrefix string
@@ -48,6 +50,7 @@ func New(deps Dependencies) *Module {
 	return &Module{
 		upload:       command.NewUploadImageHandler(repo, files, quota.NewRedis(deps.Redis, deps.UploadsPerHour, time.Hour)),
 		collect:      command.NewCollectUnattachedHandler(repo, files, transaction.NewPgxManager(deps.Pool), UnattachedTTL),
+		attach:       command.NewAttachImagesHandler(repo, deps.PublicPrefix),
 		users:        deps.Users,
 		auth:         deps.Auth,
 		publicPrefix: deps.PublicPrefix,
@@ -55,6 +58,14 @@ func New(deps Dependencies) *Module {
 }
 
 func (m *Module) Name() string { return "media" }
+
+// AttachImages verifies that every id is the owner's upload, marks them as used and returns
+// their URLs. Call it inside the caller's transaction (platform/transaction) so the attach
+// commits or rolls back with the caller's data. contract.ErrNotFound if any id is missing
+// or foreign.
+func (m *Module) AttachImages(ctx context.Context, ownerID uuid.UUID, ids []uuid.UUID) ([]contract.ImageRef, error) {
+	return m.attach.Handle(ctx, ownerID, ids)
+}
 
 // CollectUnattached removes one batch of expired unattached uploads (worker job).
 func (m *Module) CollectUnattached(ctx context.Context, batch int) (int, error) {

@@ -52,6 +52,10 @@ func (r *fakeRepo) LockUnattached(context.Context, time.Time, int) ([]ports.Imag
 
 func (r *fakeRepo) DeleteByIDs(context.Context, []uuid.UUID) error { return nil }
 
+func (r *fakeRepo) Attach(context.Context, uuid.UUID, []uuid.UUID) ([]ports.ImageRecord, error) {
+	return nil, nil
+}
+
 type fakeQuota struct{ allow bool }
 
 func (q fakeQuota) Allow(context.Context, uuid.UUID) (bool, error) { return q.allow, nil }

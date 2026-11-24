@@ -22,6 +22,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 | feed | BC | Read-side лента: курсор, фильтр типов, режимы `following` / `popular` | reviews, social, users |
 | search | BC | Read-side поиск: trends-табы (media / authors / types) + общий текстовый поиск (`@username`, название обзора, media object) | reviews, catalog, social, users |
 | gamification | BC | Очки + Steam-lite магазин косметики (`shop_items`, inventory, equipped keys) + achievements (справочник, прогресс %, unlock + reward points). Consumers `review.published` / `review.voted` / `user.followed` | reviews, users, social |
+| lists | BC | Топы и подборки (SPEC-lists): шаблоны (`list_templates` + элементы и тиры), неизменяемые снапшоты версий (`list_template_versions`), результаты (`list_results`, `list_result_entries`), жалобы (`list_reports`) и модерация администратором. Форматы `tiers` / `ranked` / `collection` | reviews (типы, причины жалоб), catalog, media, users |
 | notifications | BC | Пуши в Telegram. Скелет сразу, хендлеры после ядра | users, social, reviews |
 
 `cmd/bot` — процесс, не BC. `cmd/api`, `cmd/worker`, `cmd/migrator` — процессы.
@@ -29,7 +30,7 @@ Telegram Mini App для обзоров цифровых тайтлов. Сна�
 ## Порядок сборки
 
 ```
-platform → auth → users, media → catalog → reviews → social → feed, search, gamification → notifications
+platform → auth → users, media → catalog → reviews → lists, social → feed, search, gamification → notifications
 ```
 
 Циклов нет. `auth` не импортирует `users`: кладёт `TelegramIdentity` в context через `auth/contract`. `users` читает контракт и делает EnsureUser в своём middleware, который вешает composition root.

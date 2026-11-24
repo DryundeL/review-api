@@ -243,7 +243,7 @@
   `Content-Type` и `X-Content-Type-Options: nosniff`. Конфиг nginx
   лежит вне репозитория, нужно согласовать.
 
-### 2. Контракты существующих модулей
+### 2. Контракты существующих модулей — ✅ сделано
 
 - `catalog`: `MediaObjectRef(ctx, id) (Ref{ID, Type, Title, PosterURL}, error)`.
 - `reviews`: `RequireActiveReportReason(ctx, code)`.
@@ -252,7 +252,7 @@
   для чтения — проверить, как делает feed, и следовать тому же.
 - Обновить `CAPABILITY-MAP.md`: модули `media` и `lists`, их зависимости.
 
-### 3. lists: миграция и domain
+### 3. lists: миграция и domain — ✅ сделано
 
 - Миграция `00034` (схема выше), down — `DROP` новых таблиц.
 - domain: `Template` (`SaveDraft`, `Publish`, `Unpublish`, `SetVisibility`,
@@ -346,3 +346,20 @@ go build ./cmd/...
   `moderation: hidden` в «Мои» и 404 на публичных маршрутах.
 - Максимальные размеры изображения в пикселях и размер страницы раздела.
 - Конфигурация внешнего nginx для `/storage/images` (`nosniff`, кеширование).
+
+## Уточнения, принятые при реализации
+
+- Файлы загрузок: `/storage/images/<uuid>.<ext>` (модуль `media` общий).
+- Элемент шаблона хранит `image_url` всегда (URL загрузки из `media.AttachImages`
+  или копию постера) и `image_id` только для загрузок. Чтение не обращается к `media`.
+- `media.AttachImages` вызывается внутри транзакции сохранения шаблона: проверка владельца
+  и пометка «привязано» коммитятся или откатываются вместе с шаблоном, а блокировки строк
+  исключают гонку с GC.
+- Колонка `published_at` не нужна: сортировка идёт по `first_published_at`.
+- Позиции в результате начинаются с 1: место в топе, порядок внутри тира, порядок подборки.
+  В каждой группе позиции строго 1..n; уникальность дублирует
+  `UNIQUE NULLS NOT DISTINCT (result_id, tier_id, position)` (PostgreSQL 15+, в проде 17).
+- Жалоба ссылается на цель двумя nullable-FK (`template_id` / `result_id`) с
+  `CHECK num_nonnulls(...) = 1` вместо полиморфного `target_id`: работает ссылочная целостность.
+- Ошибки валидации: `FieldError{Field, Index, Reason}`, где `Reason` — стабильный токен
+  (`required`, `too_long`, `too_many`, `duplicate`, `immutable`, `invalid`, `type_mismatch`).

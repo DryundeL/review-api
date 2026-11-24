@@ -52,6 +52,7 @@ type Module struct {
 	getTemplate    *query.GetTemplateHandler
 	results        *command.ResultHandler
 	getResult      *query.GetResultHandler
+	lists          *query.ListHandler
 }
 
 func New(deps Dependencies) *Module {
@@ -68,6 +69,7 @@ func New(deps Dependencies) *Module {
 		getTemplate:    query.NewGetTemplateHandler(reader),
 		results:        command.NewResultHandler(writer, tx, deps.ResultQuota),
 		getResult:      query.NewGetResultHandler(reader),
+		lists:          query.NewListHandler(reader),
 	}
 }
 

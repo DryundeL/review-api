@@ -109,3 +109,57 @@ type Images interface {
 type Types interface {
 	RequireActive(ctx context.Context, code string) error
 }
+
+// MineStatus filters the author's own list. Moderation wins over status and visibility:
+// a hidden object is only in MineHidden.
+type MineStatus string
+
+const (
+	MineAll       MineStatus = ""
+	MineDraft     MineStatus = "draft"
+	MinePublished MineStatus = "published"
+	MineUnlisted  MineStatus = "unlisted"
+	MineHidden    MineStatus = "hidden"
+)
+
+// PageCursor is a keyset position: the sort time (first publication or last update) and the id.
+type PageCursor struct {
+	T  time.Time
+	ID uuid.UUID
+}
+
+// ListQuery selects one page of templates or results.
+// Without Mine it lists published public objects that are not hidden, newest first publication first;
+// AuthorID then narrows it to a profile. With Mine it lists every live object of AuthorID by last update.
+type ListQuery struct {
+	Mine     bool
+	AuthorID uuid.UUID
+	Status   MineStatus    // Mine only
+	Search   string        // plain text, matched as a substring of the title
+	TypeCode string        // empty: any
+	Format   domain.Format // empty: any
+	After    *PageCursor
+	Limit    int
+}
+
+// ListCard is one row of a list. Results take type, format and template title from their snapshot.
+type ListCard struct {
+	ID               uuid.UUID
+	Title            string
+	TypeCode         string
+	Format           domain.Format
+	CoverURL         string
+	Author           AuthorRef
+	Status           domain.Status
+	Visibility       domain.Visibility
+	Moderated        bool // the object or, for a result, its template is hidden by a moderator
+	FirstPublishedAt *time.Time
+	UpdatedAt        time.Time
+	TemplateID       uuid.UUID // results only
+	TemplateTitle    string    // results only
+}
+
+type ListReader interface {
+	ListTemplates(ctx context.Context, q ListQuery) ([]ListCard, error)
+	ListResults(ctx context.Context, q ListQuery) ([]ListCard, error)
+}

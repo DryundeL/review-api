@@ -143,8 +143,7 @@ func buildList(spec listSpec, q ports.ListQuery) (string, []any, error) {
 		where = append(where, spec.formatCol+" = "+arg(string(q.Format)))
 	}
 	if q.Search != "" {
-		// ICU collation: case folding of Cyrillic and other scripts must not depend on the database ctype.
-		where = append(where, a+".title ILIKE '%' || "+arg(escapeLike(q.Search))+` || '%' COLLATE "und-x-icu" ESCAPE '\'`)
+		where = append(where, a+".title ILIKE '%' || "+arg(escapeLike(q.Search))+" || '%' ESCAPE '\\'")
 	}
 	if q.After != nil {
 		where = append(where, "("+sortCol+", "+a+".id) < ("+arg(q.After.T)+", "+arg(q.After.ID)+")")

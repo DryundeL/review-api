@@ -41,6 +41,7 @@ type Dependencies struct {
 	Images        ImageAttacher
 	Reviews       ReviewDictionaries
 	TemplateQuota int
+	ResultQuota   int
 }
 
 type Module struct {
@@ -49,6 +50,8 @@ type Module struct {
 	templateState  *command.TemplateStateHandler
 	copyTemplate   *command.CopyTemplateHandler
 	getTemplate    *query.GetTemplateHandler
+	results        *command.ResultHandler
+	getResult      *query.GetResultHandler
 }
 
 func New(deps Dependencies) *Module {
@@ -63,6 +66,8 @@ func New(deps Dependencies) *Module {
 		templateState:  command.NewTemplateStateHandler(writer, catalog, tx),
 		copyTemplate:   command.NewCopyTemplateHandler(writer, tx, deps.TemplateQuota),
 		getTemplate:    query.NewGetTemplateHandler(reader),
+		results:        command.NewResultHandler(writer, tx, deps.ResultQuota),
+		getResult:      query.NewGetResultHandler(reader),
 	}
 }
 

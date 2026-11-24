@@ -57,15 +57,24 @@ func (r *Repository) InsertTemplate(ctx context.Context, t domain.Template) erro
 }
 
 func (r *Repository) GetTemplateForUpdate(ctx context.Context, id uuid.UUID) (domain.Template, error) {
+	return r.lockTemplate(ctx, id, "FOR UPDATE")
+}
+
+func (r *Repository) GetTemplateForShare(ctx context.Context, id uuid.UUID) (domain.Template, error) {
+	return r.lockTemplate(ctx, id, "FOR SHARE")
+}
+
+// lockTemplate loads a template that is not deleted; lock is a fixed clause, never input.
+func (r *Repository) lockTemplate(ctx context.Context, id uuid.UUID, lock string) (domain.Template, error) {
 	if id == uuid.Nil {
 		return domain.Template{}, contract.ErrNotFound
 	}
-	const q = `
+	q := `
 		SELECT id, author_id, type_code, format, title, description, status, visibility, revision,
 			first_published_at, moderation_hidden_at, created_at
 		FROM list_templates
 		WHERE id = $1 AND deleted_at IS NULL
-		FOR UPDATE`
+		` + lock
 	var t domain.Template
 	err := r.queryRow(ctx, q, id).Scan(&t.ID, &t.AuthorID, &t.TypeCode, &t.Format, &t.Title, &t.Description,
 		&t.Status, &t.Visibility, &t.Revision, &t.FirstPublishedAt, &t.ModerationHiddenAt, &t.CreatedAt)

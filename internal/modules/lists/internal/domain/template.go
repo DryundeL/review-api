@@ -228,7 +228,8 @@ func checkPublishable(c TemplateContent) error {
 	return nil
 }
 
-func (t *Template) content() TemplateContent {
+// Content is the editable part of the template.
+func (t *Template) Content() TemplateContent {
 	return TemplateContent{TypeCode: t.TypeCode, Format: t.Format, Title: t.Title, Description: t.Description, Tiers: t.Tiers, Items: t.Items}
 }
 
@@ -237,7 +238,7 @@ func (t *Template) Publish(visibility Visibility, now time.Time) error {
 	if t.ModerationHiddenAt != nil {
 		return contract.ErrModerated
 	}
-	if err := checkPublishable(t.content()); err != nil {
+	if err := checkPublishable(t.Content()); err != nil {
 		return err
 	}
 	if t.FirstPublishedAt == nil {

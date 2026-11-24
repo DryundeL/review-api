@@ -3,13 +3,11 @@ package write_test
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"review-api/internal/platform/database"
 )
@@ -17,39 +15,9 @@ import (
 // TestListsSchemaIntegration checks the invariants the migration enforces on its own,
 // independent of application code.
 func TestListsSchemaIntegration(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL is required for PostgreSQL integration test")
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	admin, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer admin.Close()
-	schema := "test_lists_" + uuid.New().String()[:8]
-	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if _, err := admin.Exec(context.Background(), "DROP SCHEMA "+schema+" CASCADE"); err != nil {
-			t.Error(err)
-		}
-	}()
-	cfg, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.ConnConfig.RuntimeParams["search_path"] = schema
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
-	if err := database.MigrateUp(ctx, pool); err != nil {
-		t.Fatal(err)
-	}
+	pool := testPool(t, ctx)
 
 	exec := func(sql string, args ...any) {
 		t.Helper()

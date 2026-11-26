@@ -163,3 +163,58 @@ type ListReader interface {
 	ListTemplates(ctx context.Context, q ListQuery) ([]ListCard, error)
 	ListResults(ctx context.Context, q ListQuery) ([]ListCard, error)
 }
+
+type ReportTarget string
+
+const (
+	TargetTemplate ReportTarget = "template"
+	TargetResult   ReportTarget = "result"
+)
+
+type ReportStatus string
+
+const (
+	ReportOpen     ReportStatus = "open"
+	ReportResolved ReportStatus = "resolved"
+)
+
+type Report struct {
+	ID         uuid.UUID
+	Target     ReportTarget
+	TargetID   uuid.UUID
+	ReporterID uuid.UUID
+	ReasonCode string
+	Status     ReportStatus
+	CreatedAt  time.Time
+	ResolvedAt *time.Time
+}
+
+// ModerationWriter stores reports and moderator decisions.
+type ModerationWriter interface {
+	// InsertReport fails with contract.ErrAlreadyReported while the reporter has an open report on the target.
+	InsertReport(ctx context.Context, r Report) error
+	// ResolveReport closes an open report: contract.ErrNotFound if missing, contract.ErrConflict if already closed.
+	ResolveReport(ctx context.Context, id uuid.UUID) (Report, error)
+	// SetHidden sets or clears the moderation mark, deleted objects included (a deleted template still hides
+	// its results). Hiding keeps the first hiding time. contract.ErrNotFound if the object does not exist.
+	SetHidden(ctx context.Context, target ReportTarget, id uuid.UUID, hidden bool) error
+}
+
+// ReportCard is an open report for the moderator, with the current state of its target.
+type ReportCard struct {
+	Report
+	TargetTitle    string
+	TargetAuthorID uuid.UUID
+	TargetHidden   bool
+	TargetDeleted  bool
+}
+
+type ReportReader interface {
+	// OpenReports lists open reports oldest first, after the cursor when it is set.
+	OpenReports(ctx context.Context, after *PageCursor, limit int) ([]ReportCard, error)
+}
+
+// ReportReasons checks that a report reason is active. contract.FieldError for an unknown or inactive one.
+type ReportReasons interface {
+	RequireActive(ctx context.Context, code string) error
+}

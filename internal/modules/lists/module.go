@@ -53,6 +53,9 @@ type Module struct {
 	results        *command.ResultHandler
 	getResult      *query.GetResultHandler
 	lists          *query.ListHandler
+	reports        *command.ReportHandler
+	moderation     *command.ModerationHandler
+	reportQueue    *query.ReportQueueHandler
 }
 
 func New(deps Dependencies) *Module {
@@ -70,6 +73,9 @@ func New(deps Dependencies) *Module {
 		results:        command.NewResultHandler(writer, tx, deps.ResultQuota),
 		getResult:      query.NewGetResultHandler(reader),
 		lists:          query.NewListHandler(reader),
+		reports:        command.NewReportHandler(reader, reader, writer, reasonsAdapter{deps.Reviews}),
+		moderation:     command.NewModerationHandler(writer),
+		reportQueue:    query.NewReportQueueHandler(reader),
 	}
 }
 
@@ -120,6 +126,19 @@ func (a typesAdapter) RequireActive(ctx context.Context, code string) error {
 	err := a.reviews.RequireActiveTypes(ctx, []string{code})
 	if _, ok := errors.AsType[reviewscontract.FieldError](err); ok {
 		return contract.Field("typeCode", contract.ReasonInvalid)
+	}
+	return err
+}
+
+type reasonsAdapter struct{ reviews ReviewDictionaries }
+
+func (a reasonsAdapter) RequireActive(ctx context.Context, code string) error {
+	if a.reviews == nil {
+		return contract.ErrInvalid
+	}
+	err := a.reviews.RequireActiveReportReason(ctx, code)
+	if _, ok := errors.AsType[reviewscontract.FieldError](err); ok {
+		return contract.Field("reasonCode", contract.ReasonInvalid)
 	}
 	return err
 }

@@ -15,6 +15,8 @@ var (
 	ErrModerated = errors.New("hidden by moderator")
 	// ErrQuotaExceeded: the author reached the limit of templates or results.
 	ErrQuotaExceeded = errors.New("quota exceeded")
+	// ErrForbidden: the action is not allowed to this user, e.g. reporting one's own object.
+	ErrForbidden = errors.New("forbidden")
 	// ErrAlreadyReported: the reporter already has an open report on this object.
 	ErrAlreadyReported = errors.New("already reported")
 )

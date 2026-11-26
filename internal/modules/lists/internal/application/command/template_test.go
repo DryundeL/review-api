@@ -194,7 +194,7 @@ func TestSaveTemplateItems(t *testing.T) {
 	saved, err := f.save.Handle(ctx, tpl.ID, f.author, SaveTemplateInput{
 		Revision: 1, Title: "Игры",
 		Items: []ItemInput{
-			{MediaObjectID: &f.halo},           // title and poster from the catalog
+			{MediaObjectID: &f.halo},            // title and poster from the catalog
 			{Title: "Своя игра", ImageID: &img}, // manual item with an upload
 		},
 	})

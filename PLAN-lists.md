@@ -300,7 +300,7 @@
 - Восстановление: прежние статус и видимость сохраняются сами,
   потому что скрытие — отдельное поле.
 
-### 8. HTTP, wiring, документация
+### 8. HTTP, wiring, документация — ✅ сделано
 
 - `internal/app/modules.go`: подключить `media` и `lists`.
 - `BodyLimit` 128 КБ на JSON-запись. `Cache-Control: no-store` на ответы
@@ -412,3 +412,15 @@ go build ./cmd/...
 - `resolve`: 404 для несуществующей, 409 для уже закрытой жалобы.
 - Аудит: `slog` `admin action` с `action`, `target`, `id`, без пользовательских данных.
   Rate limit на создание жалоб — на шаге 8, в HTTP.
+- HTTP: «Мои» — `/profile/list-templates` и `/profile/list-results`, а не `/me/...`: так уже
+  устроены `reviews` и `social`. Admin-middleware ставится на каждый маршрут, без группы `/admin`.
+- Ответ любой команды перечитывается через query: автор получает тот же вид, что и при `GET`.
+- Гостю не отдаются `revision`, `status`, `visibility`, `moderation`, `createdAt`/`updatedAt`
+  и `imageId`. В карточках результатов нет `templateId`: id шаблона, открытого по ссылке, не утекает
+  через раздел. `template.id` и `canCreateOwn` в результате зависят от `TemplatePublic`.
+- Кеш: `no-store` на ответы автору, «Мои», команды и admin; одиночное чтение и профиль — `Vary: Authorization`.
+- Коды: `ErrModerated` → 403 `HIDDEN_BY_MODERATOR`, `ErrQuotaExceeded` → 422 `QUOTA_EXCEEDED`,
+  `FieldError` → 422 с `details {field, reason, index?}`. `revision < 1` в publish/PUT/refresh → 422.
+- Квоты и лимит жалоб — в конфиге: `LISTS_TEMPLATE_QUOTA` (50), `LISTS_RESULT_QUOTA` (200),
+  `LISTS_REPORTS_PER_HOUR` (20, Redis, на пользователя). При недоступном Redis лимит жалоб
+  пропускает запрос, как и общий per-IP limit.

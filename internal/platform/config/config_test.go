@@ -42,6 +42,9 @@ func TestValidateRequiresSecrets(t *testing.T) {
 			MediaStorageDir:     "storage",
 			MediaPublicPrefix:   "/storage",
 			MediaUploadsPerHour: 120,
+			ListsTemplateQuota:  50,
+			ListsResultQuota:    200,
+			ListsReportsPerHour: 20,
 			ReportHideThreshold: 10,
 		},
 	}
@@ -87,6 +90,9 @@ func TestValidateReportHideThreshold(t *testing.T) {
 			MediaStorageDir:     "storage",
 			MediaPublicPrefix:   "/storage",
 			MediaUploadsPerHour: 120,
+			ListsTemplateQuota:  50,
+			ListsResultQuota:    200,
+			ListsReportsPerHour: 20,
 			ReportHideThreshold: 0,
 		},
 	}
@@ -110,6 +116,7 @@ func TestValidateMedia(t *testing.T) {
 				JWTSecret: strings.Repeat("s", 32), AdminToken: strings.Repeat("a", 32),
 				RateLimitPerMin: 60, WorkerBatch: 50, ReportHideThreshold: 10,
 				MediaStorageDir: "storage", MediaPublicPrefix: "/storage", MediaUploadsPerHour: 120,
+				ListsTemplateQuota: 50, ListsResultQuota: 200, ListsReportsPerHour: 20,
 			},
 		}
 	}
@@ -117,10 +124,13 @@ func TestValidateMedia(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, mutate := range map[string]func(*Config){
-		"empty dir":         func(c *Config) { c.App.MediaStorageDir = "" },
-		"http prefix":       func(c *Config) { c.App.MediaPublicPrefix = "http://cdn.example" },
-		"relative prefix":   func(c *Config) { c.App.MediaPublicPrefix = "storage" },
-		"zero upload quota": func(c *Config) { c.App.MediaUploadsPerHour = 0 },
+		"empty dir":           func(c *Config) { c.App.MediaStorageDir = "" },
+		"http prefix":         func(c *Config) { c.App.MediaPublicPrefix = "http://cdn.example" },
+		"relative prefix":     func(c *Config) { c.App.MediaPublicPrefix = "storage" },
+		"zero upload quota":   func(c *Config) { c.App.MediaUploadsPerHour = 0 },
+		"zero template quota": func(c *Config) { c.App.ListsTemplateQuota = 0 },
+		"zero result quota":   func(c *Config) { c.App.ListsResultQuota = 0 },
+		"zero report limit":   func(c *Config) { c.App.ListsReportsPerHour = 0 },
 	} {
 		cfg := valid()
 		mutate(cfg)

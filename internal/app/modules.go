@@ -13,6 +13,7 @@ import (
 	catalogcontract "review-api/internal/modules/catalog/contract"
 	"review-api/internal/modules/feed"
 	"review-api/internal/modules/gamification"
+	"review-api/internal/modules/lists"
 	"review-api/internal/modules/media"
 	"review-api/internal/modules/notifications"
 	"review-api/internal/modules/reviews"
@@ -39,6 +40,7 @@ type Modules struct {
 	Notifications *notifications.Module
 	Gamification  *gamification.Module
 	Media         *media.Module
+	Lists         *lists.Module
 }
 
 func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modules {
@@ -124,12 +126,25 @@ func WireModules(cfg *config.Config, pool *pgxpool.Pool, rdb *redis.Client) Modu
 		PublicPrefix:   cfg.App.MediaPublicPrefix,
 		UploadsPerHour: cfg.App.MediaUploadsPerHour,
 	})
+	listsMod := lists.New(lists.Dependencies{
+		Pool:           pool,
+		Redis:          rdb,
+		Auth:           authMod.Middlewares.Bearer,
+		Admin:          admin,
+		Users:          usersMod,
+		Catalog:        catalogMod,
+		Images:         mediaMod,
+		Reviews:        reviewsMod,
+		TemplateQuota:  cfg.App.ListsTemplateQuota,
+		ResultQuota:    cfg.App.ListsResultQuota,
+		ReportsPerHour: cfg.App.ListsReportsPerHour,
+	})
 	return Modules{
 		Auth: authMod, Users: usersMod, Reviews: reviewsMod,
 		Catalog: catalogMod, Social: socialMod, Feed: feedMod, Search: searchMod,
 		Sitemap:       sitemap.New(sitemap.Dependencies{Pool: pool}),
 		Notifications: notificationsMod, Gamification: gamificationMod,
-		Media: mediaMod,
+		Media: mediaMod, Lists: listsMod,
 	}
 }
 

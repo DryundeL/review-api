@@ -3,21 +3,34 @@ package lists
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/labstack/echo/v4"
+	"github.com/redis/go-redis/v9"
 
 	catalogcontract "review-api/internal/modules/catalog/contract"
 	"review-api/internal/modules/lists/contract"
 	"review-api/internal/modules/lists/internal/application/command"
 	"review-api/internal/modules/lists/internal/application/ports"
 	"review-api/internal/modules/lists/internal/application/query"
+	listshttp "review-api/internal/modules/lists/internal/delivery/http"
 	"review-api/internal/modules/lists/internal/infrastructure/read"
 	"review-api/internal/modules/lists/internal/infrastructure/write"
 	mediacontract "review-api/internal/modules/media/contract"
 	reviewscontract "review-api/internal/modules/reviews/contract"
+	"review-api/internal/platform/ratelimit"
 	"review-api/internal/platform/transaction"
 )
+
+// DefaultReportsPerHour is used when the config leaves the report limit unset.
+const DefaultReportsPerHour = 20
+
+// UserResolver is the users module.
+type UserResolver interface {
+	UserID(ctx context.Context, telegramID int64) (uuid.UUID, error)
+}
 
 // CatalogLookup is the catalog module.
 type CatalogLookup interface {
@@ -36,12 +49,17 @@ type ReviewDictionaries interface {
 }
 
 type Dependencies struct {
-	Pool          *pgxpool.Pool
-	Catalog       CatalogLookup
-	Images        ImageAttacher
-	Reviews       ReviewDictionaries
-	TemplateQuota int
-	ResultQuota   int
+	Pool           *pgxpool.Pool
+	Redis          *redis.Client
+	Auth           echo.MiddlewareFunc
+	Admin          echo.MiddlewareFunc
+	Users          UserResolver
+	Catalog        CatalogLookup
+	Images         ImageAttacher
+	Reviews        ReviewDictionaries
+	TemplateQuota  int
+	ResultQuota    int
+	ReportsPerHour int
 }
 
 type Module struct {
@@ -56,6 +74,10 @@ type Module struct {
 	reports        *command.ReportHandler
 	moderation     *command.ModerationHandler
 	reportQueue    *query.ReportQueueHandler
+	users          UserResolver
+	auth           echo.MiddlewareFunc
+	admin          echo.MiddlewareFunc
+	reportLimiter  reportLimiter
 }
 
 func New(deps Dependencies) *Module {
@@ -76,10 +98,41 @@ func New(deps Dependencies) *Module {
 		reports:        command.NewReportHandler(reader, reader, writer, reasonsAdapter{deps.Reviews}),
 		moderation:     command.NewModerationHandler(writer),
 		reportQueue:    query.NewReportQueueHandler(reader),
+		users:          deps.Users,
+		auth:           deps.Auth,
+		admin:          deps.Admin,
+		reportLimiter:  reportLimiter{rdb: deps.Redis, limit: reportsPerHour(deps.ReportsPerHour)},
 	}
 }
 
 func (m *Module) Name() string { return "lists" }
+
+func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) {
+	h := listshttp.NewHandler(listshttp.Deps{
+		CreateTemplate: m.createTemplate, SaveTemplate: m.saveTemplate, TemplateState: m.templateState,
+		CopyTemplate: m.copyTemplate, GetTemplate: m.getTemplate, Results: m.results, GetResult: m.getResult,
+		Lists: m.lists, Reports: m.reports, Moderation: m.moderation, ReportQueue: m.reportQueue,
+		Users: m.users, ReportLimiter: m.reportLimiter,
+	})
+	listshttp.Register(g, h, m.admin, m.auth, profileAccess)
+}
+
+func reportsPerHour(n int) int {
+	if n > 0 {
+		return n
+	}
+	return DefaultReportsPerHour
+}
+
+// reportLimiter caps reports per user and hour, on top of the per-IP limit of the API.
+type reportLimiter struct {
+	rdb   *redis.Client
+	limit int
+}
+
+func (l reportLimiter) Allow(ctx context.Context, userID uuid.UUID) (bool, error) {
+	return ratelimit.Allow(ctx, l.rdb, "rl:lists:reports:"+userID.String(), l.limit, time.Hour)
+}
 
 type catalogAdapter struct{ catalog CatalogLookup }
 

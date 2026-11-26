@@ -81,6 +81,9 @@ type AppConfig struct {
 	MediaStorageDir     string
 	MediaPublicPrefix   string
 	MediaUploadsPerHour int
+	ListsTemplateQuota  int
+	ListsResultQuota    int
+	ListsReportsPerHour int
 }
 
 func Load() (*Config, error) {
@@ -136,6 +139,18 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	listsTemplateQuota, err := atoiDefault("LISTS_TEMPLATE_QUOTA", 50)
+	if err != nil {
+		return nil, err
+	}
+	listsResultQuota, err := atoiDefault("LISTS_RESULT_QUOTA", 200)
+	if err != nil {
+		return nil, err
+	}
+	listsReportsPerHour, err := atoiDefault("LISTS_REPORTS_PER_HOUR", 20)
+	if err != nil {
+		return nil, err
+	}
 	cfg := &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -182,6 +197,9 @@ func Load() (*Config, error) {
 			MediaStorageDir:     getEnv("MEDIA_STORAGE_DIR", "storage"),
 			MediaPublicPrefix:   getEnv("MEDIA_PUBLIC_PREFIX", "/storage"),
 			MediaUploadsPerHour: mediaUploadsPerHour,
+			ListsTemplateQuota:  listsTemplateQuota,
+			ListsResultQuota:    listsResultQuota,
+			ListsReportsPerHour: listsReportsPerHour,
 		},
 	}
 
@@ -233,6 +251,9 @@ func (c *Config) Validate() error {
 	}
 	if c.App.MediaUploadsPerHour < 1 {
 		return fmt.Errorf("MEDIA_UPLOADS_PER_HOUR must be >= 1")
+	}
+	if c.App.ListsTemplateQuota < 1 || c.App.ListsResultQuota < 1 || c.App.ListsReportsPerHour < 1 {
+		return fmt.Errorf("LISTS_TEMPLATE_QUOTA, LISTS_RESULT_QUOTA and LISTS_REPORTS_PER_HOUR must be >= 1")
 	}
 	switch c.App.Env {
 	case "development", "staging", "production":

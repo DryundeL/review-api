@@ -138,7 +138,7 @@ func (h *SaveTemplateHandler) content(ctx context.Context, tpl domain.Template, 
 	}
 	typeChanged := c.TypeCode != tpl.TypeCode
 	// After the first publication the domain rejects the change as immutable.
-	if typeChanged && tpl.FirstPublishedAt == nil && c.TypeCode != "" {
+	if typeChanged && tpl.FirstPublishedAt == nil && c.TypeCode != "" && c.TypeCode != domain.TypeMixed {
 		if err := h.types.RequireActive(ctx, c.TypeCode); err != nil {
 			return c, err
 		}
@@ -224,9 +224,12 @@ func resolveItems(current []domain.Item, in []ItemInput, works map[uuid.UUID]por
 	return out, uploads, nil
 }
 
-// checkWorkTypes requires every catalog item to match the template type. Existing items are
-// re-checked only when the type changes.
+// checkWorkTypes requires every catalog item to match the template type; a mixed template takes
+// any. Existing items are re-checked only when the type changes.
 func (h *SaveTemplateHandler) checkWorkTypes(ctx context.Context, typeCode string, items []domain.Item, works map[uuid.UUID]ports.CatalogWork, typeChanged bool) error {
+	if typeCode == domain.TypeMixed {
+		return nil
+	}
 	for i, item := range items {
 		if item.MediaObjectID == nil {
 			continue

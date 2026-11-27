@@ -265,6 +265,18 @@ func TestFeedWithListsHTTPIntegration(t *testing.T) {
 		t.Fatalf("likes = %+v", p)
 	}
 
+	// A result of a mixed template (NULL type): found by type=mixed only, never with reviews.
+	exec(`UPDATE list_template_versions SET type_code = NULL WHERE id = (SELECT version_id FROM list_results WHERE id = $1)`, res.ID)
+	if p := getFeed("?type=mixed", ""); len(p.Items) != 1 || p.Items[0].List == nil || p.Items[0].List.TypeCode != "mixed" {
+		t.Fatalf("type=mixed = %+v", p)
+	}
+	if p := getFeed("?type=manga", ""); len(p.Items) != 1 || p.Items[0].Kind != "review" {
+		t.Fatalf("type=manga with a mixed list = %+v", p)
+	}
+	if p := getFeed("?kind=reviews&type=mixed", ""); len(p.Items) != 0 {
+		t.Fatalf("kind=reviews&type=mixed = %+v", p)
+	}
+
 	// Unlisted and hidden results leave the feed but keep their counters.
 	check("PATCH", resPath+"/visibility", "bob", `{"visibility":"unlisted"}`, 200)
 	if p := getFeed("?kind=lists", ""); len(p.Items) != 0 {

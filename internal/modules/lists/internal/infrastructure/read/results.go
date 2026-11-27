@@ -23,7 +23,7 @@ func (r *Repository) Result(ctx context.Context, id uuid.UUID) (ports.ResultView
 		SELECT r.id, r.author_id, r.template_id, r.version_id, v.format, r.title, r.description, r.status,
 			r.visibility, r.revision, r.first_published_at, r.moderation_hidden_at, r.created_at, r.updated_at,
 			COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
-			v.type_code, v.title, v.author_id, COALESCE(tu.username, ''), COALESCE(tu.photo_url, ''),
+			COALESCE(v.type_code, 'mixed'), v.title, v.author_id, COALESCE(tu.username, ''), COALESCE(tu.photo_url, ''),
 			t.moderation_hidden_at IS NOT NULL,
 			t.status = 'published' AND t.visibility = 'public' AND t.deleted_at IS NULL AND t.moderation_hidden_at IS NULL,
 			r.likes_count, r.dislikes_count, r.views_count
@@ -63,14 +63,16 @@ func (r *Repository) Result(ctx context.Context, id uuid.UUID) (ports.ResultView
 		return ports.ResultView{}, fmt.Errorf("read list version tiers: %w", err)
 	}
 	rows, err = r.pool.Query(ctx, `
-		SELECT item_id, title, media_object_id, image_url FROM list_template_version_items
-		WHERE version_id = $1 ORDER BY position`, res.VersionID)
+		SELECT vi.item_id, vi.title, vi.media_object_id, vi.image_url, COALESCE(mo.type::text, '')
+		FROM list_template_version_items vi
+		LEFT JOIN media_objects mo ON mo.id = vi.media_object_id
+		WHERE vi.version_id = $1 ORDER BY vi.position`, res.VersionID)
 	if err != nil {
 		return ports.ResultView{}, fmt.Errorf("read list version items: %w", err)
 	}
 	snap.Items, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Item, error) {
 		var it domain.Item
-		err := row.Scan(&it.ID, &it.Title, &it.MediaObjectID, &it.ImageURL)
+		err := row.Scan(&it.ID, &it.Title, &it.MediaObjectID, &it.ImageURL, &it.MediaType)
 		return it, err
 	})
 	if err != nil {

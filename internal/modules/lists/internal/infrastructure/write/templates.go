@@ -48,7 +48,7 @@ func (r *Repository) InsertTemplate(ctx context.Context, t domain.Template) erro
 	const q = `
 		INSERT INTO list_templates (id, author_id, type_code, format, title, description, status, visibility,
 			revision, first_published_at, moderation_hidden_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)`
+		VALUES ($1, $2, NULLIF($3, 'mixed'), $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)`
 	if _, err := r.exec(ctx, q, t.ID, t.AuthorID, t.TypeCode, t.Format, t.Title, t.Description, t.Status,
 		t.Visibility, t.Revision, t.FirstPublishedAt, t.ModerationHiddenAt, t.CreatedAt); err != nil {
 		return mapTemplateError(err)
@@ -70,7 +70,7 @@ func (r *Repository) lockTemplate(ctx context.Context, id uuid.UUID, lock string
 		return domain.Template{}, contract.ErrNotFound
 	}
 	q := `
-		SELECT id, author_id, type_code, format, title, description, status, visibility, revision,
+		SELECT id, author_id, COALESCE(type_code, 'mixed'), format, title, description, status, visibility, revision,
 			first_published_at, moderation_hidden_at, created_at
 		FROM list_templates
 		WHERE id = $1 AND deleted_at IS NULL
@@ -123,7 +123,7 @@ func (r *Repository) items(ctx context.Context, templateID uuid.UUID) ([]domain.
 func (r *Repository) UpdateTemplate(ctx context.Context, t domain.Template, withContent bool) error {
 	const q = `
 		UPDATE list_templates
-		SET type_code = $2, format = $3, title = $4, description = $5, status = $6, visibility = $7,
+		SET type_code = NULLIF($2, 'mixed'), format = $3, title = $4, description = $5, status = $6, visibility = $7,
 			revision = $8, first_published_at = $9, updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL`
 	tag, err := r.exec(ctx, q, t.ID, t.TypeCode, t.Format, t.Title, t.Description, t.Status, t.Visibility,

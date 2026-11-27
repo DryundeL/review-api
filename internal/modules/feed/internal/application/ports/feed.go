@@ -25,6 +25,10 @@ const (
 	ItemList   = "list"
 )
 
+// TypeMixed is the type filter value for list results of mixed templates (NULL type in storage).
+// It matches no review.
+const TypeMixed = "mixed"
+
 // MediaObjectRef is a compact catalog title embedded in feed items.
 type MediaObjectRef struct {
 	ID        uuid.UUID

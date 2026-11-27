@@ -11,6 +11,7 @@ import (
 
 	"review-api/internal/modules/lists/contract"
 	"review-api/internal/modules/lists/internal/application/ports"
+	"review-api/internal/modules/lists/internal/domain"
 )
 
 // listSpec holds the fixed SQL of one entity. Only these fragments and numbered
@@ -28,7 +29,7 @@ type listSpec struct {
 var (
 	templateList = listSpec{
 		from: `
-			SELECT t.id, t.title, t.type_code, t.format, t.status, t.visibility,
+			SELECT t.id, t.title, COALESCE(t.type_code, 'mixed'), t.format, t.status, t.visibility,
 				t.moderation_hidden_at IS NOT NULL, t.first_published_at, t.updated_at,
 				t.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 				COALESCE((SELECT i.image_url FROM list_template_items i
@@ -43,7 +44,7 @@ var (
 	}
 	resultList = listSpec{
 		from: `
-			SELECT r.id, r.title, v.type_code, v.format, r.status, r.visibility,
+			SELECT r.id, r.title, COALESCE(v.type_code, 'mixed'), v.format, r.status, r.visibility,
 				(r.moderation_hidden_at IS NOT NULL OR t.moderation_hidden_at IS NOT NULL),
 				r.first_published_at, r.updated_at,
 				r.author_id, COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
@@ -136,7 +137,11 @@ func buildList(spec listSpec, q ports.ListQuery) (string, []any, error) {
 			where = append(where, a+".author_id = "+arg(q.AuthorID))
 		}
 	}
-	if q.TypeCode != "" {
+	switch q.TypeCode {
+	case "":
+	case domain.TypeMixed:
+		where = append(where, spec.typeCol+" IS NULL")
+	default:
 		where = append(where, spec.typeCol+" = "+arg(q.TypeCode))
 	}
 	if q.Format != "" {

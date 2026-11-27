@@ -3,6 +3,7 @@ package write_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,6 +47,11 @@ func TestListsSchemaIntegration(t *testing.T) {
 
 	tplA, tplB := uuid.New(), uuid.New()
 	exec(`INSERT INTO list_templates (id, author_id, type_code, title) VALUES ($1, $3, 'game', 'A'), ($2, $3, 'game', 'B')`, tplA, tplB, user)
+
+	// A mixed template has no type; "mixed" stays reserved and never enters the review dictionary.
+	mixedTpl := uuid.New()
+	exec(`INSERT INTO list_templates (id, author_id, type_code) VALUES ($1, $2, NULL)`, mixedTpl, user)
+	wantCode(checkViolation, `INSERT INTO review_types (code, label, sort_order) VALUES ('mixed', 'Смесь', 1)`)
 
 	// Template items: a catalog work at most once; the catalog row may disappear later.
 	itemWork := uuid.New()
@@ -122,6 +128,12 @@ func TestListsSchemaIntegration(t *testing.T) {
 	wantCode(checkViolation, `UPDATE list_reports SET status = 'resolved' WHERE id = $1`, first)
 	exec(`UPDATE list_reports SET status = 'resolved', resolved_at = NOW() WHERE id = $1`, first)
 	exec(`INSERT INTO list_reports (id, result_id, reporter_id, reason_code) VALUES ($1, $2, $3, 'abuse')`, uuid.New(), res, user)
+
+	// Rolling back mixed templates is refused while any exist: older code cannot read a NULL type.
+	if err := database.MigrateDown(ctx, pool); err == nil || !strings.Contains(err.Error(), "mixed list templates exist") {
+		t.Fatalf("down with a mixed template: %v", err)
+	}
+	exec(`DELETE FROM list_templates WHERE id = $1`, mixedTpl)
 
 	// The down migration removes the module cleanly and up re-applies it.
 	if err := database.MigrateDown(ctx, pool); err != nil {

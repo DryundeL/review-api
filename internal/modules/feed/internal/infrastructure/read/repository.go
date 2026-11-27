@@ -33,6 +33,7 @@ type branch struct {
 	where     string // visibility filter of the kind
 	author    string
 	typeCol   string
+	mixed     string // filter for type=mixed
 	sortT     string
 	views     string
 	likes     string
@@ -61,6 +62,7 @@ var (
 		where:   `r.status = 'published'`,
 		author:  "r.author_id",
 		typeCol: "mo.type",
+		mixed:   "FALSE",
 		sortT:   "r.created_at",
 		views:   "r.views_count",
 		likes:   "r.likes_count",
@@ -77,7 +79,7 @@ var (
 			lr.likes_count::bigint, lr.dislikes_count::bigint, lr.views_count::bigint,
 			(SELECT v.is_like FROM list_result_votes v WHERE v.result_id = lr.id AND v.user_id = {viewer}),
 			lr.first_published_at AS sort_t,
-			lv.type_code, lv.format,
+			COALESCE(lv.type_code, 'mixed'), lv.format,
 			COALESCE((SELECT vi.image_url
 				FROM list_result_entries e
 				JOIN list_template_version_items vi ON vi.version_id = e.version_id AND vi.item_id = e.item_id
@@ -96,6 +98,7 @@ var (
 			AND lr.moderation_hidden_at IS NULL AND lt.moderation_hidden_at IS NULL`,
 		author:  "lr.author_id",
 		typeCol: "lv.type_code",
+		mixed:   "lv.type_code IS NULL",
 		sortT:   "lr.first_published_at",
 		views:   "lr.views_count",
 		likes:   "lr.likes_count",
@@ -166,7 +169,7 @@ func buildList(p ports.ListParams) (string, []any, error) {
 	viewer := arg(p.ViewerID)
 	limit := arg(p.Limit)
 	var mediaType, curV, curT, curID string
-	if p.Type != "" {
+	if p.Type != "" && p.Type != ports.TypeMixed {
 		mediaType = arg(p.Type)
 	}
 	if p.Cursor != nil {
@@ -197,7 +200,9 @@ func buildList(p ports.ListParams) (string, []any, error) {
 			b.WriteString(` AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ` + viewer +
 				` AND f.followee_id = ` + br.author + `)`)
 		}
-		if mediaType != "" {
+		if p.Type == ports.TypeMixed {
+			b.WriteString(" AND " + br.mixed)
+		} else if mediaType != "" {
 			b.WriteString(" AND " + br.typeCol + " = " + mediaType)
 		}
 		if p.Cursor != nil {

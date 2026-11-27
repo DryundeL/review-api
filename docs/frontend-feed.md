@@ -13,7 +13,7 @@
 | `kind` | `all`, `reviews`, `lists` | `all` |
 | `sort` | `new`, `views`, `likes` | `new` |
 | `mode` | `all`, `following` (только авторы, на которых подписан пользователь) | `all` |
-| `type` | код типа (`manga`, …): у обзора — тип произведения, у топа — тип шаблона | любой |
+| `type` | код типа (`manga`, …): у обзора — тип произведения, у топа — тип шаблона. `mixed` — только смешанные топы | любой |
 | `limit` | 1–50 | 20 |
 | `cursor` | `nextCursor` из предыдущего ответа | — |
 
@@ -51,7 +51,7 @@ interface FeedItem {
 
   // только kind = "list"
   list?: {
-    typeCode: string;
+    typeCode: string;      // "mixed" у смешанных топов
     format: "tiers" | "ranked" | "collection";
     coverUrl?: string;     // считает сервер, правила — в frontend-lists.md, раздел 4
     templateTitle: string;
@@ -68,4 +68,5 @@ interface FeedItem {
   в ленте теперь приходят и топы. У них нет `mediaObject` и `rating`.
 - **`rating`** приходит только у обзоров.
 - **Только обзоры:** `kind=reviews` даёт прежнюю выдачу.
+- **Смешанные топы:** `list.typeCode` может быть `"mixed"`; `type=manga` их не возвращает.
 - **Реакции топов** описаны в [frontend-lists.md](frontend-lists.md), раздел 3.8.

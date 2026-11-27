@@ -28,7 +28,7 @@ func (r *Repository) Template(ctx context.Context, id uuid.UUID) (ports.Template
 		return ports.TemplateView{}, contract.ErrNotFound
 	}
 	const q = `
-		SELECT t.id, t.author_id, t.type_code, t.format, t.title, t.description, t.status, t.visibility,
+		SELECT t.id, t.author_id, COALESCE(t.type_code, 'mixed'), t.format, t.title, t.description, t.status, t.visibility,
 			t.revision, t.first_published_at, t.moderation_hidden_at, t.created_at, t.updated_at,
 			COALESCE(u.username, ''), COALESCE(u.photo_url, '')
 		FROM list_templates t
@@ -60,14 +60,16 @@ func (r *Repository) Template(ctx context.Context, id uuid.UUID) (ports.Template
 		return ports.TemplateView{}, fmt.Errorf("read list template tiers: %w", err)
 	}
 	rows, err = r.pool.Query(ctx, `
-		SELECT id, title, media_object_id, image_id, COALESCE(image_url, '')
-		FROM list_template_items WHERE template_id = $1 ORDER BY position`, id)
+		SELECT i.id, i.title, i.media_object_id, i.image_id, COALESCE(i.image_url, ''), COALESCE(mo.type::text, '')
+		FROM list_template_items i
+		LEFT JOIN media_objects mo ON mo.id = i.media_object_id
+		WHERE i.template_id = $1 ORDER BY i.position`, id)
 	if err != nil {
 		return ports.TemplateView{}, fmt.Errorf("read list template items: %w", err)
 	}
 	t.Items, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Item, error) {
 		var it domain.Item
-		err := row.Scan(&it.ID, &it.Title, &it.MediaObjectID, &it.ImageID, &it.ImageURL)
+		err := row.Scan(&it.ID, &it.Title, &it.MediaObjectID, &it.ImageID, &it.ImageURL, &it.MediaType)
 		return it, err
 	})
 	if err != nil {

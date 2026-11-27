@@ -31,6 +31,7 @@ type itemJSON struct {
 	MediaObjectID *string `json:"mediaObjectId,omitempty"`
 	ImageURL      string  `json:"imageUrl,omitempty"`
 	ImageID       *string `json:"imageId,omitempty"` // author only
+	MediaType     string  `json:"mediaType,omitempty"`
 }
 
 // ownerJSON holds the fields only the author receives: guests never see drafts or revisions.
@@ -169,7 +170,7 @@ func tiersJSON(in []domain.Tier) []tierJSON {
 func itemsJSON(in []domain.Item, isOwner bool) []itemJSON {
 	out := make([]itemJSON, 0, len(in))
 	for _, it := range in {
-		j := itemJSON{ID: it.ID.String(), Title: it.Title, MediaObjectID: idPtrJSON(it.MediaObjectID), ImageURL: it.ImageURL}
+		j := itemJSON{ID: it.ID.String(), Title: it.Title, MediaObjectID: idPtrJSON(it.MediaObjectID), ImageURL: it.ImageURL, MediaType: it.MediaType}
 		if isOwner {
 			j.ImageID = idPtrJSON(it.ImageID)
 		}

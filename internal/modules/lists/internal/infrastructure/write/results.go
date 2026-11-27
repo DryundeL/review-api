@@ -41,7 +41,7 @@ func (r *Repository) TemplateModerated(ctx context.Context, templateID uuid.UUID
 func (r *Repository) EnsureSnapshot(ctx context.Context, t domain.Template) (domain.Snapshot, error) {
 	const insertVersion = `
 		INSERT INTO list_template_versions (id, template_id, revision, author_id, type_code, format, title)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, NULLIF($5, 'mixed'), $6, $7)
 		ON CONFLICT ON CONSTRAINT list_template_versions_revision_key DO NOTHING`
 	versionID := uuid.New()
 	tag, err := r.exec(ctx, insertVersion, versionID, t.ID, t.Revision, t.AuthorID, t.TypeCode, t.Format, t.Title)

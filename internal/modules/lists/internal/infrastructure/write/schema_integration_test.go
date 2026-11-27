@@ -47,6 +47,10 @@ func TestListsSchemaIntegration(t *testing.T) {
 	tplA, tplB := uuid.New(), uuid.New()
 	exec(`INSERT INTO list_templates (id, author_id, type_code, title) VALUES ($1, $3, 'game', 'A'), ($2, $3, 'game', 'B')`, tplA, tplB, user)
 
+	// A mixed template has no type; "mixed" stays reserved and never enters the review dictionary.
+	exec(`INSERT INTO list_templates (id, author_id, type_code) VALUES ($1, $2, NULL)`, uuid.New(), user)
+	wantCode(checkViolation, `INSERT INTO review_types (code, label, sort_order) VALUES ('mixed', 'Смесь', 1)`)
+
 	// Template items: a catalog work at most once; the catalog row may disappear later.
 	itemWork := uuid.New()
 	exec(`INSERT INTO list_template_items (template_id, id, position, title, media_object_id, image_url) VALUES ($1, $2, 0, 'Halo', $3, 'https://cdn.example/halo.jpg')`, tplA, itemWork, work)

@@ -32,6 +32,7 @@ func NewListFeedHandler(repo ports.Reader) *ListFeedHandler {
 type ListInput struct {
 	Sort     string
 	Mode     string
+	Kind     string
 	Type     string
 	Cursor   string
 	Limit    int
@@ -47,6 +48,10 @@ func (h *ListFeedHandler) Handle(ctx context.Context, in ListInput) (Page, error
 		return Page{}, err
 	}
 	mode, err := parseMode(in.Mode)
+	if err != nil {
+		return Page{}, err
+	}
+	kind, err := parseKind(in.Kind)
 	if err != nil {
 		return Page{}, err
 	}
@@ -66,6 +71,7 @@ func (h *ListFeedHandler) Handle(ctx context.Context, in ListInput) (Page, error
 	rows, err := h.repo.List(ctx, ports.ListParams{
 		Sort:     sort,
 		Mode:     mode,
+		Kind:     kind,
 		Type:     mediaType,
 		ViewerID: in.ViewerID,
 		Cursor:   cur,
@@ -108,5 +114,17 @@ func parseMode(raw string) (string, error) {
 		return raw, nil
 	default:
 		return "", contract.FieldError{Field: "mode"}
+	}
+}
+
+func parseKind(raw string) (string, error) {
+	if raw == "" {
+		return ports.KindAll, nil
+	}
+	switch raw {
+	case ports.KindAll, ports.KindReviews, ports.KindLists:
+		return raw, nil
+	default:
+		return "", contract.FieldError{Field: "kind"}
 	}
 }

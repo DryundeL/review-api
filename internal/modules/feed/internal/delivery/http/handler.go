@@ -30,14 +30,17 @@ func NewHandler(list *query.ListFeedHandler, users UserResolver) *Handler {
 	return &Handler{list: list, users: users}
 }
 
+// feedItemJSON: kind "review" carries mediaObject, rating and hasSpoilers; kind "list" carries list.
 type feedItemJSON struct {
+	Kind          string           `json:"kind"`
 	ID            string           `json:"id"`
 	AuthorID      string           `json:"authorId"`
 	Author        authorJSON       `json:"author"`
 	MediaObject   *mediaObjectJSON `json:"mediaObject,omitempty"`
 	Title         string           `json:"title"`
-	Rating        int16            `json:"rating"`
+	Rating        *int16           `json:"rating,omitempty"`
 	HasSpoilers   bool             `json:"hasSpoilers"`
+	List          *listJSON        `json:"list,omitempty"`
 	LikesCount    int64            `json:"likesCount"`
 	DislikesCount int64            `json:"dislikesCount"`
 	ViewsCount    int64            `json:"viewsCount"`
@@ -60,6 +63,13 @@ type mediaObjectJSON struct {
 	PosterURL string `json:"posterUrl,omitempty"`
 }
 
+type listJSON struct {
+	TypeCode      string `json:"typeCode"`
+	Format        string `json:"format"`
+	CoverURL      string `json:"coverUrl,omitempty"`
+	TemplateTitle string `json:"templateTitle"`
+}
+
 type feedResponse struct {
 	Items      []feedItemJSON `json:"items"`
 	NextCursor *string        `json:"nextCursor"`
@@ -75,6 +85,7 @@ func (h *Handler) ListFeed(c echo.Context) error {
 	page, err := h.list.Handle(c.Request().Context(), query.ListInput{
 		Sort:     c.QueryParam("sort"),
 		Mode:     mode,
+		Kind:     c.QueryParam("kind"),
 		Type:     c.QueryParam("type"),
 		Cursor:   c.QueryParam("cursor"),
 		Limit:    parseLimit(c),
@@ -124,7 +135,8 @@ func parseLimit(c echo.Context) int {
 }
 
 func itemJSON(item ports.Item) feedItemJSON {
-	return feedItemJSON{
+	out := feedItemJSON{
+		Kind:     item.Kind,
 		ID:       item.ID.String(),
 		AuthorID: item.AuthorID.String(),
 		Author: authorJSON{
@@ -137,13 +149,22 @@ func itemJSON(item ports.Item) feedItemJSON {
 		},
 		MediaObject:   mediaJSON(item.MediaObject),
 		Title:         item.Title,
-		Rating:        item.Rating,
 		HasSpoilers:   item.HasSpoilers,
 		LikesCount:    item.LikesCount,
 		DislikesCount: item.DislikesCount,
 		ViewsCount:    item.ViewsCount,
 		ViewerIsLike:  item.ViewerIsLike,
 	}
+	if item.Kind == ports.ItemList {
+		out.List = &listJSON{
+			TypeCode: item.List.TypeCode, Format: item.List.Format,
+			CoverURL: item.List.CoverURL, TemplateTitle: item.List.TemplateTitle,
+		}
+	} else {
+		rating := item.Rating
+		out.Rating = &rating
+	}
+	return out
 }
 
 func mediaJSON(mo ports.MediaObjectRef) *mediaObjectJSON {

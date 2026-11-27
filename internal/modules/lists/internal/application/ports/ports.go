@@ -79,11 +79,62 @@ type ResultView struct {
 	// TemplatePublic: the template is published, public, not deleted and not moderated,
 	// so the result may link to it and offer to create one's own result.
 	TemplatePublic bool
+	LikesCount     int64
+	DislikesCount  int64
+	ViewsCount     int64
+	// ViewerIsLike is filled by GetResultHandler for a signed-in viewer.
+	ViewerIsLike *bool
 }
 
 type ResultReader interface {
 	// Result returns a result that is not deleted; contract.ErrNotFound otherwise.
 	Result(ctx context.Context, id uuid.UUID) (ResultView, error)
+}
+
+// ResultPageReader reads what the result page shows: the result and the viewer's vote.
+type ResultPageReader interface {
+	ResultReader
+	// ViewerVote is the viewer's vote on the result: true like, false dislike, nil none.
+	ViewerVote(ctx context.Context, resultID, viewerID uuid.UUID) (*bool, error)
+}
+
+// ReactionWriter stores votes, views and comments of results. Methods must run in the
+// caller's transaction.
+type ReactionWriter interface {
+	// LockOpenResult locks a result that others may see and react to: published, not deleted,
+	// neither it nor its template hidden by a moderator. Unlisted results are open too.
+	// exclusive takes the row lock that counter updates need; otherwise the lock only keeps the
+	// result from being unpublished, deleted or hidden meanwhile. It returns the result's author,
+	// or contract.ErrNotFound.
+	LockOpenResult(ctx context.Context, id uuid.UUID, exclusive bool) (uuid.UUID, error)
+	// UpsertVote sets the user's vote and adjusts the counters. The result must be locked exclusively.
+	UpsertVote(ctx context.Context, resultID, userID uuid.UUID, isLike bool) error
+	// InsertView records the first view of the user; later views change nothing.
+	InsertView(ctx context.Context, resultID, userID uuid.UUID) error
+	// CommentExists reports whether the comment belongs to the result.
+	CommentExists(ctx context.Context, resultID, commentID uuid.UUID) (bool, error)
+	InsertComment(ctx context.Context, c domain.Comment) error
+}
+
+// Comment is a comment with its author for the read side.
+type Comment struct {
+	domain.Comment
+	Author     AuthorRef
+	HasReplies bool
+}
+
+// CommentPosition is a keyset position in a thread, oldest first.
+type CommentPosition struct {
+	CreatedAt time.Time `json:"t"`
+	ID        uuid.UUID `json:"id"`
+}
+
+type CommentReader interface {
+	// Comment returns a comment of an open result; contract.ErrNotFound otherwise.
+	Comment(ctx context.Context, resultID, commentID uuid.UUID) (Comment, error)
+	// ListComments lists top-level comments (parentID nil) or the replies to one, oldest first.
+	// contract.ErrNotFound when the result is not open or the parent is not its comment.
+	ListComments(ctx context.Context, resultID uuid.UUID, parentID *uuid.UUID, after *CommentPosition, limit int) ([]Comment, error)
 }
 
 // CatalogWork is the catalog data copied into a template item.

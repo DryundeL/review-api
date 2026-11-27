@@ -74,6 +74,8 @@ type Module struct {
 	reports        *command.ReportHandler
 	moderation     *command.ModerationHandler
 	reportQueue    *query.ReportQueueHandler
+	reactions      *command.ReactionHandler
+	comments       *query.CommentsHandler
 	users          UserResolver
 	auth           echo.MiddlewareFunc
 	admin          echo.MiddlewareFunc
@@ -98,6 +100,8 @@ func New(deps Dependencies) *Module {
 		reports:        command.NewReportHandler(reader, reader, writer, reasonsAdapter{deps.Reviews}),
 		moderation:     command.NewModerationHandler(writer),
 		reportQueue:    query.NewReportQueueHandler(reader),
+		reactions:      command.NewReactionHandler(writer, reader, tx),
+		comments:       query.NewCommentsHandler(reader),
 		users:          deps.Users,
 		auth:           deps.Auth,
 		admin:          deps.Admin,
@@ -112,6 +116,7 @@ func (m *Module) RegisterHTTP(g *echo.Group, profileAccess echo.MiddlewareFunc) 
 		CreateTemplate: m.createTemplate, SaveTemplate: m.saveTemplate, TemplateState: m.templateState,
 		CopyTemplate: m.copyTemplate, GetTemplate: m.getTemplate, Results: m.results, GetResult: m.getResult,
 		Lists: m.lists, Reports: m.reports, Moderation: m.moderation, ReportQueue: m.reportQueue,
+		Reactions: m.reactions, Comments: m.comments,
 		Users: m.users, ReportLimiter: m.reportLimiter,
 	})
 	listshttp.Register(g, h, m.admin, m.auth, profileAccess)

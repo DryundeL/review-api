@@ -49,8 +49,10 @@ func (h *CreateTemplateHandler) Handle(ctx context.Context, authorID uuid.UUID, 
 	if err != nil {
 		return domain.Template{}, err
 	}
-	if err := h.types.RequireActive(ctx, tpl.TypeCode); err != nil {
-		return domain.Template{}, err
+	if tpl.TypeCode != domain.TypeMixed {
+		if err := h.types.RequireActive(ctx, tpl.TypeCode); err != nil {
+			return domain.Template{}, err
+		}
 	}
 	err = h.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := checkTemplateQuota(txCtx, h.repo, authorID, h.quota); err != nil {

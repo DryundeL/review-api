@@ -367,3 +367,34 @@ func TestTemplateStateAndRefresh(t *testing.T) {
 		t.Fatalf("copy moderated: %v", err)
 	}
 }
+
+func TestMixedTemplate(t *testing.T) {
+	t.Parallel()
+	f := newFixture(5)
+	ctx := context.Background()
+	// "mixed" is not in the type dictionary and must not be looked up there.
+	tpl, err := f.create.Handle(ctx, f.author, CreateTemplateInput{TypeCode: domain.TypeMixed, Format: "ranked", Title: "Всё подряд"})
+	if err != nil || tpl.TypeCode != domain.TypeMixed {
+		t.Fatalf("create mixed = %+v, %v", tpl, err)
+	}
+	items := []ItemInput{{MediaObjectID: &f.halo}, {MediaObjectID: &f.dune}, {Title: "Пицца", ImageID: ptr(f.upload(f.author))}}
+	saved, err := f.save.Handle(ctx, tpl.ID, f.author, SaveTemplateInput{Revision: tpl.Revision, Title: "Всё подряд", Items: items})
+	if err != nil || len(saved.Items) != 3 {
+		t.Fatalf("save mixed = %+v, %v", saved, err)
+	}
+	// Leaving "mixed" re-checks every catalog work against the new type.
+	keep := []ItemInput{{ID: &saved.Items[0].ID}, {ID: &saved.Items[1].ID}, {ID: &saved.Items[2].ID}}
+	_, err = f.save.Handle(ctx, tpl.ID, f.author, SaveTemplateInput{Revision: saved.Revision, TypeCode: ptr("game"), Title: "Игры", Items: keep})
+	wantField(t, err, "items.mediaObjectId", contract.ReasonMismatch)
+	if _, err := f.state.Publish(ctx, tpl.ID, f.author, saved.Revision, ""); err != nil {
+		t.Fatalf("publish mixed: %v", err)
+	}
+
+	// A typed draft may become mixed and then take a work of another type.
+	game := f.draft(t, "ranked")
+	if _, err := f.save.Handle(ctx, game.ID, f.author, SaveTemplateInput{
+		Revision: game.Revision, TypeCode: ptr(domain.TypeMixed), Title: "Смесь", Items: []ItemInput{{MediaObjectID: &f.dune}},
+	}); err != nil {
+		t.Fatalf("typed → mixed: %v", err)
+	}
+}

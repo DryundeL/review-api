@@ -12,6 +12,10 @@ import (
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
+// TypeMixed is the template type that accepts catalog works of any type alongside manual items.
+// It is not in the review type dictionary; storage keeps it as a NULL type_code.
+const TypeMixed = "mixed"
+
 type Tier struct {
 	ID    uuid.UUID
 	Name  string

@@ -239,6 +239,11 @@ func TestListsHTTPIntegration(t *testing.T) {
 	check("GET", "/list-templates?limit=0x", "", "", 422)
 	check("GET", "/list-templates?cursor=garbage", "", "", 422)
 
+	// The author may rank their own published template too.
+	var own listsObject
+	decode(check("POST", tplPath+"/results", "alice", "", 201), &own)
+	check("DELETE", "/list-results/"+own.ID, "alice", "", 204)
+
 	// A result on the template: foreign item ids are rejected, the template link is public.
 	var res listsObject
 	rec = check("POST", tplPath+"/results", "bob", "", 201)

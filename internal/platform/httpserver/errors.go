@@ -51,6 +51,11 @@ func ErrorHandler(err error, c echo.Context) {
 		}
 	}
 
+	if status >= http.StatusInternalServerError {
+		// The client gets a generic message, so the cause must reach the log.
+		GetLoggerFromContext(c.Request()).ErrorContext(c.Request().Context(), "unhandled error",
+			"method", c.Request().Method, "path", c.Request().URL.Path, "error", err)
+	}
 	if writeErr := c.JSON(status, httperr.Body{Error: httperr.Detail{
 		Code:    code,
 		Message: message,

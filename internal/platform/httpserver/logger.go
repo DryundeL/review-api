@@ -28,13 +28,17 @@ func LoggerMiddleware(base *slog.Logger) echo.MiddlewareFunc {
 
 			start := time.Now()
 			err := next(c)
+			if err != nil {
+				// Write the error response now, so the status below is the one sent.
+				c.Error(err)
+			}
 			logger.Info("http request",
 				"method", c.Request().Method,
 				"path", c.Request().URL.Path,
 				"status", c.Response().Status,
 				"duration_ms", time.Since(start).Milliseconds(),
 			)
-			return err
+			return nil
 		}
 	}
 }

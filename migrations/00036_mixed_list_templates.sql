@@ -6,16 +6,17 @@ ALTER TABLE list_template_versions ALTER COLUMN type_code DROP NOT NULL;
 ALTER TABLE review_types ADD CONSTRAINT review_types_code_reserved_chk CHECK (code <> 'mixed');
 
 -- +goose Down
--- Mixed templates are not deleted on rollback: NOT NULL comes back only when none exist,
--- otherwise the columns stay nullable, which older code reads without harm.
-ALTER TABLE review_types DROP CONSTRAINT IF EXISTS review_types_code_reserved_chk;
+-- Refused while mixed templates exist: older code scans type_code into a non-null string and
+-- would fail on every page that shows one. Delete or retype them first; nothing is dropped silently.
 -- +goose StatementBegin
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM list_templates WHERE type_code IS NULL)
-        AND NOT EXISTS (SELECT 1 FROM list_template_versions WHERE type_code IS NULL) THEN
-        ALTER TABLE list_template_versions ALTER COLUMN type_code SET NOT NULL;
-        ALTER TABLE list_templates ALTER COLUMN type_code SET NOT NULL;
+    IF EXISTS (SELECT 1 FROM list_templates WHERE type_code IS NULL)
+        OR EXISTS (SELECT 1 FROM list_template_versions WHERE type_code IS NULL) THEN
+        RAISE EXCEPTION 'mixed list templates exist; delete or retype them before rolling back 00036';
     END IF;
 END $$;
 -- +goose StatementEnd
+ALTER TABLE list_template_versions ALTER COLUMN type_code SET NOT NULL;
+ALTER TABLE list_templates ALTER COLUMN type_code SET NOT NULL;
+ALTER TABLE review_types DROP CONSTRAINT IF EXISTS review_types_code_reserved_chk;

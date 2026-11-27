@@ -11,10 +11,10 @@ import (
 )
 
 type GetResultHandler struct {
-	repo ports.ResultReader
+	repo ports.ResultPageReader
 }
 
-func NewGetResultHandler(repo ports.ResultReader) *GetResultHandler {
+func NewGetResultHandler(repo ports.ResultPageReader) *GetResultHandler {
 	return &GetResultHandler{repo: repo}
 }
 
@@ -31,6 +31,11 @@ func (h *GetResultHandler) Handle(ctx context.Context, id, viewerID uuid.UUID) (
 	isOwner := viewerID != uuid.Nil && v.AuthorID == viewerID
 	if !CanViewResult(v.Result, v.TemplateModerated, isOwner) {
 		return ports.ResultView{}, false, contract.ErrNotFound
+	}
+	if viewerID != uuid.Nil {
+		if v.ViewerIsLike, err = h.repo.ViewerVote(ctx, id, viewerID); err != nil {
+			return ports.ResultView{}, false, err
+		}
 	}
 	return v, isOwner, nil
 }

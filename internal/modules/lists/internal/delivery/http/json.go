@@ -87,6 +87,11 @@ type resultJSON struct {
 	Tiers            []tierJSON         `json:"tiers"`
 	Items            []itemJSON         `json:"items"`
 	Entries          []entryJSON        `json:"entries"`
+	LikesCount       int64              `json:"likesCount"`
+	DislikesCount    int64              `json:"dislikesCount"`
+	ViewsCount       int64              `json:"viewsCount"`
+	// ViewerIsLike: true like, false dislike, absent for no vote or a guest.
+	ViewerIsLike *bool `json:"viewerIsLike,omitempty"`
 	ownerJSON
 }
 
@@ -209,7 +214,9 @@ func resultResponse(v ports.ResultView, isOwner bool) resultJSON {
 		Template:     resultTemplateJSON{Title: v.Snapshot.Title},
 		CanCreateOwn: v.TemplatePublic,
 		Tiers:        tiersJSON(v.Snapshot.Tiers), Items: itemsJSON(v.Snapshot.Items, false),
-		Entries: entriesJSON(r.Entries),
+		Entries:    entriesJSON(r.Entries),
+		LikesCount: v.LikesCount, DislikesCount: v.DislikesCount, ViewsCount: v.ViewsCount,
+		ViewerIsLike: v.ViewerIsLike,
 	}
 	if v.TemplateAuthor.ID != uuid.Nil {
 		j.Template.Author = new(authorOf(v.TemplateAuthor))

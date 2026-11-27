@@ -39,6 +39,8 @@ type Deps struct {
 	Reports        *command.ReportHandler
 	Moderation     *command.ModerationHandler
 	ReportQueue    *query.ReportQueueHandler
+	Reactions      *command.ReactionHandler
+	Comments       *query.CommentsHandler
 	Users          UserResolver
 	ReportLimiter  ReportLimiter
 }

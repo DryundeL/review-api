@@ -25,7 +25,8 @@ func (r *Repository) Result(ctx context.Context, id uuid.UUID) (ports.ResultView
 			COALESCE(u.username, ''), COALESCE(u.photo_url, ''),
 			v.type_code, v.title, v.author_id, COALESCE(tu.username, ''), COALESCE(tu.photo_url, ''),
 			t.moderation_hidden_at IS NOT NULL,
-			t.status = 'published' AND t.visibility = 'public' AND t.deleted_at IS NULL AND t.moderation_hidden_at IS NULL
+			t.status = 'published' AND t.visibility = 'public' AND t.deleted_at IS NULL AND t.moderation_hidden_at IS NULL,
+			r.likes_count, r.dislikes_count, r.views_count
 		FROM list_results r
 		JOIN list_template_versions v ON v.id = r.version_id
 		JOIN list_templates t ON t.id = r.template_id
@@ -38,7 +39,7 @@ func (r *Repository) Result(ctx context.Context, id uuid.UUID) (ports.ResultView
 		&res.Title, &res.Description, &res.Status, &res.Visibility, &res.Revision, &res.FirstPublishedAt,
 		&res.ModerationHiddenAt, &res.CreatedAt, &v.UpdatedAt, &v.Author.Username, &v.Author.PhotoURL,
 		&v.TypeCode, &snap.Title, &v.TemplateAuthor.ID, &v.TemplateAuthor.Username, &v.TemplateAuthor.PhotoURL,
-		&v.TemplateModerated, &v.TemplatePublic)
+		&v.TemplateModerated, &v.TemplatePublic, &v.LikesCount, &v.DislikesCount, &v.ViewsCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ports.ResultView{}, contract.ErrNotFound
 	}

@@ -48,6 +48,10 @@ func Register(g *echo.Group, h *Handler, admin, auth echo.MiddlewareFunc, profil
 	g.PATCH("/list-results/:id/visibility", h.ResultVisibility, auth, limit)
 	g.POST("/list-results/:id/copy", h.CopyResult, auth)
 	g.POST("/list-results/:id/reports", h.ReportResult, auth, limit)
+	g.PUT("/list-results/:id/vote", h.VoteResult, auth, limit)
+	g.PUT("/list-results/:id/view", h.ViewResult, auth)
+	g.GET("/list-results/:id/comments", h.ListResultComments, opt)
+	g.POST("/list-results/:id/comments", h.CreateResultComment, auth)
 
 	// Admin middleware per route: a "/admin" group would add a catch-all shared with other modules.
 	g.GET("/admin/list-reports", h.ReportQueue, admin)

@@ -14,6 +14,15 @@ const (
 
 	ModeAll       = "all"
 	ModeFollowing = "following"
+
+	// Kind filters what the feed mixes.
+	KindAll     = "all"
+	KindReviews = "reviews"
+	KindLists   = "lists"
+
+	// ItemReview and ItemList tell feed items apart.
+	ItemReview = "review"
+	ItemList   = "list"
 )
 
 // MediaObjectRef is a compact catalog title embedded in feed items.
@@ -34,9 +43,20 @@ type AuthorRef struct {
 	Backdrop    string
 }
 
-// Item is one published review in the feed (list shape, no blocks).
+// ListRef is what a list result card shows; type, format and template title come from its snapshot.
+type ListRef struct {
+	TypeCode      string
+	Format        string
+	CoverURL      string
+	TemplateTitle string
+}
+
+// Item is one feed entry: a published review (list shape, no blocks) or a public list result.
+// Reviews fill MediaObject, Rating and HasSpoilers; lists fill List.
 // ViewerIsLike: true=like, false=dislike, nil=no vote / anonymous viewer.
+// CreatedAt is the sort time: creation of a review, first publication of a list result.
 type Item struct {
+	Kind          string
 	ID            uuid.UUID
 	AuthorID      uuid.UUID
 	Author        AuthorRef
@@ -49,6 +69,7 @@ type Item struct {
 	ViewsCount    int64
 	ViewerIsLike  *bool
 	CreatedAt     time.Time
+	List          ListRef
 }
 
 // Cursor is a keyset position for the active sort.
@@ -63,6 +84,7 @@ type Cursor struct {
 type ListParams struct {
 	Sort     string
 	Mode     string
+	Kind     string
 	Type     string
 	ViewerID uuid.UUID // required when ModeFollowing
 	Cursor   *Cursor

@@ -66,7 +66,7 @@ func TestListFeedHandler_defaultsAndNextCursor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if repo.last.Sort != ports.SortNew || repo.last.Mode != ports.ModeAll || repo.last.Limit != 3 {
+	if repo.last.Sort != ports.SortNew || repo.last.Mode != ports.ModeAll || repo.last.Kind != ports.KindAll || repo.last.Limit != 3 {
 		t.Fatalf("params %+v", repo.last)
 	}
 	if len(page.Items) != 2 || page.NextCursor == "" {
@@ -84,6 +84,10 @@ func TestListFeedHandler_rejectsBadSortAndFollowingWithoutViewer(t *testing.T) {
 	var field contract.FieldError
 	if !errors.As(err, &field) || field.Field != "sort" {
 		t.Fatalf("want sort error, got %v", err)
+	}
+	_, err = h.Handle(context.Background(), ListInput{Kind: "templates"})
+	if !errors.As(err, &field) || field.Field != "kind" {
+		t.Fatalf("want kind error, got %v", err)
 	}
 	_, err = h.Handle(context.Background(), ListInput{Mode: ports.ModeFollowing})
 	if !errors.Is(err, contract.ErrUnauthorized) {

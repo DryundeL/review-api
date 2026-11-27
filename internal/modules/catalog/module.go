@@ -3,6 +3,8 @@ package catalog
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
@@ -60,6 +62,18 @@ func (b typeBridge) RequireActive(ctx context.Context, codes []string) error {
 }
 
 func (m *Module) Name() string { return "catalog" }
+
+// MediaObjectRef returns type, title and poster of a work; contract.ErrNotFound if it does not exist.
+func (m *Module) MediaObjectRef(ctx context.Context, id uuid.UUID) (contract.MediaObjectRef, error) {
+	if m == nil || m.get == nil {
+		return contract.MediaObjectRef{}, contract.ErrNotFound
+	}
+	item, err := m.get.Handle(ctx, id)
+	if err != nil {
+		return contract.MediaObjectRef{}, err
+	}
+	return contract.MediaObjectRef{ID: item.ID, Type: item.Type, Title: item.Title, PosterURL: item.PosterURL}, nil
+}
 
 func (m *Module) RegisterHTTP(g *echo.Group) {
 	cataloghttp.Register(g, cataloghttp.NewHandler(m.importBatch, m.get, m.search), m.admin)

@@ -78,6 +78,12 @@ type AppConfig struct {
 	SMTPUser            string
 	SMTPPassword        string
 	SMTPFrom            string
+	MediaStorageDir     string
+	MediaPublicPrefix   string
+	MediaUploadsPerHour int
+	ListsTemplateQuota  int
+	ListsResultQuota    int
+	ListsReportsPerHour int
 }
 
 func Load() (*Config, error) {
@@ -129,6 +135,22 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	mediaUploadsPerHour, err := atoiDefault("MEDIA_UPLOADS_PER_HOUR", 120)
+	if err != nil {
+		return nil, err
+	}
+	listsTemplateQuota, err := atoiDefault("LISTS_TEMPLATE_QUOTA", 50)
+	if err != nil {
+		return nil, err
+	}
+	listsResultQuota, err := atoiDefault("LISTS_RESULT_QUOTA", 200)
+	if err != nil {
+		return nil, err
+	}
+	listsReportsPerHour, err := atoiDefault("LISTS_REPORTS_PER_HOUR", 20)
+	if err != nil {
+		return nil, err
+	}
 	cfg := &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -172,6 +194,12 @@ func Load() (*Config, error) {
 			SMTPUser:            os.Getenv("SMTP_USER"),
 			SMTPPassword:        os.Getenv("SMTP_PASSWORD"),
 			SMTPFrom:            os.Getenv("SMTP_FROM"),
+			MediaStorageDir:     getEnv("MEDIA_STORAGE_DIR", "storage"),
+			MediaPublicPrefix:   getEnv("MEDIA_PUBLIC_PREFIX", "/storage"),
+			MediaUploadsPerHour: mediaUploadsPerHour,
+			ListsTemplateQuota:  listsTemplateQuota,
+			ListsResultQuota:    listsResultQuota,
+			ListsReportsPerHour: listsReportsPerHour,
 		},
 	}
 
@@ -214,6 +242,18 @@ func (c *Config) Validate() error {
 	}
 	if c.App.SMTPHost != "" && (c.App.SMTPPort < 1 || c.App.SMTPPort > 65535 || c.App.SMTPFrom == "") {
 		return fmt.Errorf("SMTP_PORT and SMTP_FROM are required when SMTP_HOST is set")
+	}
+	if c.App.MediaStorageDir == "" {
+		return fmt.Errorf("MEDIA_STORAGE_DIR is required")
+	}
+	if !strings.HasPrefix(c.App.MediaPublicPrefix, "/") && !strings.HasPrefix(c.App.MediaPublicPrefix, "https://") {
+		return fmt.Errorf("MEDIA_PUBLIC_PREFIX must be a path starting with / or an https:// URL")
+	}
+	if c.App.MediaUploadsPerHour < 1 {
+		return fmt.Errorf("MEDIA_UPLOADS_PER_HOUR must be >= 1")
+	}
+	if c.App.ListsTemplateQuota < 1 || c.App.ListsResultQuota < 1 || c.App.ListsReportsPerHour < 1 {
+		return fmt.Errorf("LISTS_TEMPLATE_QUOTA, LISTS_RESULT_QUOTA and LISTS_REPORTS_PER_HOUR must be >= 1")
 	}
 	switch c.App.Env {
 	case "development", "staging", "production":

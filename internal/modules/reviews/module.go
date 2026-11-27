@@ -2,6 +2,7 @@ package reviews
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -97,6 +98,22 @@ func (m *Module) RequireActiveTypes(ctx context.Context, codes []string) error {
 		return contract.FieldError{Field: "type"}
 	}
 	return m.types.RequireActive(ctx, codes)
+}
+
+// RequireActiveReportReason checks a report reason code from the shared report_reasons dictionary.
+func (m *Module) RequireActiveReportReason(ctx context.Context, code string) error {
+	code = strings.TrimSpace(code)
+	if m == nil || m.types == nil || code == "" {
+		return contract.FieldError{Field: "reasonCode"}
+	}
+	ok, err := m.types.IsActive(ctx, code)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return contract.FieldError{Field: "reasonCode"}
+	}
+	return nil
 }
 
 // PublishedReviewRef returns author/title for a published review (notification consumers).

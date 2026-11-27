@@ -10,6 +10,7 @@ import (
 
 	"review-api/internal/app/bot"
 	"review-api/internal/modules/gamification"
+	"review-api/internal/modules/media"
 	"review-api/internal/modules/notifications"
 	"review-api/internal/modules/reviews"
 	"review-api/internal/modules/users"
@@ -22,9 +23,13 @@ import (
 
 const serviceName = "review-api-worker"
 
+// mediaGCInterval: unattached uploads expire after a day, an hourly sweep is enough.
+const mediaGCInterval = time.Hour
+
 type App struct {
 	DB       *pgxpool.Pool
 	Relayer  outbox.Relayer
+	Media    *media.Module
 	log      *slog.Logger
 	interval time.Duration
 	batch    int
@@ -72,9 +77,12 @@ func Bootstrap(ctx context.Context) (*App, error) {
 	}}
 	relayer := outbox.NewRelayer(pool, bus, outbox.RelayerOptions{Logger: log})
 
+	mediaMod := media.New(media.Dependencies{Pool: pool, StorageDir: cfg.App.MediaStorageDir})
+
 	return &App{
 		DB:       pool,
 		Relayer:  relayer,
+		Media:    mediaMod,
 		log:      log,
 		interval: cfg.App.WorkerPoll,
 		batch:    cfg.App.WorkerBatch,
@@ -85,6 +93,8 @@ func (a *App) Run(ctx context.Context) error {
 	a.log.Info("worker started", "service", serviceName, "poll_interval", a.interval.String(), "batch_size", a.batch)
 	ticker := time.NewTicker(a.interval)
 	defer ticker.Stop()
+	gcTicker := time.NewTicker(mediaGCInterval)
+	defer gcTicker.Stop()
 
 	if err := a.relayOnce(ctx); err != nil {
 		a.log.Error("relay tick failed", "error", err)
@@ -100,6 +110,8 @@ func (a *App) Run(ctx context.Context) error {
 			if err := a.relayOnce(ctx); err != nil {
 				a.log.Error("relay tick failed", "error", err)
 			}
+		case <-gcTicker.C:
+			a.collectMedia(ctx)
 		}
 	}
 }
@@ -113,4 +125,24 @@ func (a *App) relayOnce(ctx context.Context) error {
 		a.log.Info("relay batch done", "published", n)
 	}
 	return nil
+}
+
+// collectMedia drains expired uploads in batches; a failed batch is retried on the next tick.
+func (a *App) collectMedia(ctx context.Context) {
+	const batch = 100
+	total := 0
+	for ctx.Err() == nil {
+		n, err := a.Media.CollectUnattached(ctx, batch)
+		if err != nil {
+			a.log.Error("media gc failed", "error", err)
+			return
+		}
+		total += n
+		if n < batch {
+			break
+		}
+	}
+	if total > 0 {
+		a.log.Info("media gc done", "removed", total)
+	}
 }

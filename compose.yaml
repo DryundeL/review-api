@@ -52,6 +52,14 @@ services:
   worker:
     <<: *app
     command: [/app/worker]
+    # Media GC removes expired uploads, so the worker needs the same storage as the API.
+    volumes:
+      - type: bind
+        source: ${STORAGE_HOST_PATH:-/home/wapp/apps/review-api/storage}
+        target: /app/storage
+        read_only: false
+        bind:
+          create_host_path: false
     depends_on:
       app:
         condition: service_healthy

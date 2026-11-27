@@ -38,8 +38,9 @@ sh pull.sh
 
 ## Хранилище фотографий
 
-API получает bind mount `storage/` в `/app/storage` с правом записи.
-Остальная файловая система контейнера остаётся read-only; worker, bot и
+API и worker получают bind mount `storage/` в `/app/storage`. Пишут они
+только в `storage/images/`: API сохраняет загрузки, worker удаляет
+неиспользованные. Остальная файловая система контейнеров read-only; bot и
 migrator доступа к хранилищу не получают. Файлы не включаются в Git и
 Docker build context.
 
@@ -48,22 +49,24 @@ Docker build context.
 переменная отсутствует. Не используйте относительный путь на сервере:
 Compose запускается из каталога конкретного релиза.
 
-Перед первым деплоем с mount создайте папку и настройте владельца
-(UID 10001 пользователя приложения в контейнере). Выполняйте от `wapp`, без sudo; вместо
-`<SHA>` укажите тег уже загруженного образа:
+Перед первым деплоем создайте `storage/` и `storage/images/`. Корнем
+`storage/` владеет `wapp`: там лежат и статические файлы. Владельцем
+`images/` сделайте UID 10001 (пользователь приложения в контейнере), иначе
+загрузка вернёт 500. Выполняйте от `wapp`, без sudo; вместо `<SHA>` укажите
+тег уже загруженного образа:
 
 ```sh
-mkdir -p /home/wapp/apps/review-api/storage
+mkdir -p /home/wapp/apps/review-api/storage/images
 docker run --rm --user 0:0 --network none \
-  --mount type=bind,src=/home/wapp/apps/review-api/storage,dst=/storage \
+  --mount type=bind,src=/home/wapp/apps/review-api/storage/images,dst=/images \
   --entrypoint /bin/sh ghcr.io/dryundel/review-api:<SHA> \
-  -c 'chown 10001:10001 /storage && chmod 755 /storage'
+  -c 'chown 10001:10001 /images && chmod 755 /images'
 ```
 
 Compose намеренно не создаёт отсутствующую папку автоматически: запуск
 завершится ошибкой вместо создания каталога с неподходящими правами.
-Локально задайте `STORAGE_HOST_PATH=./storage`, создайте `storage/` в корне
-репозитория и предоставьте UID контейнера `10001` право записи с учётом
+Локально задайте `STORAGE_HOST_PATH=./storage`, создайте `storage/images/` в корне
+репозитория и предоставьте UID контейнера `10001` право записи в неё с учётом
 режима Docker на вашей машине.
 
 Фронтенд разворачивается отдельно. В его Compose подключите ту же папку

@@ -10,7 +10,7 @@ import (
 	"review-api/internal/modules/sitemap/internal/application/query"
 )
 
-// Repository is a read-only projection across catalog, reviews and profiles.
+// Repository is a read-only projection across reviews and profiles.
 type Repository struct{ pool *pgxpool.Pool }
 
 func NewRepository(pool *pgxpool.Pool) *Repository { return &Repository{pool: pool} }
@@ -18,8 +18,6 @@ func NewRepository(pool *pgxpool.Pool) *Repository { return &Repository{pool: po
 func (r *Repository) List(ctx context.Context, entity string, after uuid.UUID, limit int) ([]uuid.UUID, error) {
 	var sql string
 	switch entity {
-	case "media-objects":
-		sql = `SELECT id FROM media_objects WHERE id > $1 ORDER BY id LIMIT $2`
 	case "reviews":
 		sql = `SELECT id FROM reviews WHERE status = 'published' AND id > $1 ORDER BY id LIMIT $2`
 	case "authors":

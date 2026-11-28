@@ -50,7 +50,7 @@ func ParseRequest(entity, limit, cursor string) (Request, error) {
 }
 
 func valid(req Request) bool {
-	return (req.Entity == "media-objects" || req.Entity == "reviews" || req.Entity == "authors") && req.Limit >= 1 && req.Limit <= 1000
+	return (req.Entity == "reviews" || req.Entity == "authors") && req.Limit >= 1 && req.Limit <= 1000
 }
 
 type ListHandler struct{ repo ports.Reader }

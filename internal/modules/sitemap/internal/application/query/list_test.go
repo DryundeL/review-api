@@ -10,7 +10,7 @@ import (
 
 func TestParseRequest(t *testing.T) {
 	id := uuid.New()
-	for _, entity := range []string{"media-objects", "reviews", "authors"} {
+	for _, entity := range []string{"reviews", "authors"} {
 		req, err := ParseRequest(entity, "", "")
 		if err != nil || req.Limit != 500 || req.After != uuid.Nil {
 			t.Fatalf("default request: %+v, %v", req, err)
@@ -21,7 +21,7 @@ func TestParseRequest(t *testing.T) {
 		}
 	}
 	for _, input := range [][3]string{
-		{"users", "", ""}, {"reviews", "0", ""}, {"reviews", "-1", ""},
+		{"users", "", ""}, {"media-objects", "", ""}, {"reviews", "0", ""}, {"reviews", "-1", ""},
 		{"reviews", "1001", ""}, {"reviews", "abc", ""},
 		{"reviews", "99999999999999999999999999", ""},
 		{"reviews", "", "bad"}, {"reviews", "", uuid.Nil.String()},

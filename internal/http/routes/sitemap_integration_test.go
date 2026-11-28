@@ -103,9 +103,8 @@ func TestSitemapIntegration(t *testing.T) {
 		return p
 	}
 	for entity, expected := range map[string][]string{
-		"media-objects": {id(11), id(12), id(13), id(14), id(15)},
-		"reviews":       {id(21), id(23)},
-		"authors":       {id(1), id(3), id(4), id(5)},
+		"reviews": {id(21), id(23)},
+		"authors": {id(1), id(3), id(4), id(5)},
 	} {
 		t.Run(entity, func(t *testing.T) {
 			got := []string{}
@@ -129,18 +128,18 @@ func TestSitemapIntegration(t *testing.T) {
 		})
 	}
 	for _, path := range []string{
-		"unknown", "reviews?limit=0", "reviews?limit=1001", "reviews?limit=abc", "reviews?cursor=invalid",
+		"unknown", "media-objects", "reviews?limit=0", "reviews?limit=1001", "reviews?limit=abc", "reviews?cursor=invalid",
 	} {
 		get("/v1/sitemap/"+path, 422)
 	}
-	p := get("/v1/sitemap/media-objects?cursor="+id(99), 200)
+	p := get("/v1/sitemap/reviews?cursor="+id(99), 200)
 	if len(p.Items) != 0 || p.NextCursor != "" {
 		t.Fatalf("last page: %+v", p)
 	}
 	// Deleted boundary rows do not invalidate a cursor.
-	exec(`DELETE FROM media_objects WHERE id=$1`, id(13))
-	p = get("/v1/sitemap/media-objects?cursor="+id(13), 200)
-	if len(p.Items) != 2 || p.Items[0].ID != id(14) {
+	exec(`DELETE FROM reviews WHERE id=$1`, id(22))
+	p = get("/v1/sitemap/reviews?cursor="+id(22), 200)
+	if len(p.Items) != 1 || p.Items[0].ID != id(23) {
 		t.Fatalf("deleted cursor: %+v", p)
 	}
 	// Visibility is evaluated on every request, including subsequent pages.
